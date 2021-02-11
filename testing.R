@@ -34,13 +34,31 @@ pt_in_img <- function(path_to_file){
 }
 
 niwo_test_list <- niwo_2020_files[101:182] %>% purrr::map_lgl(~pt_in_img(.x))
-any(niwo_test_list)
+my_file <- niwo_2020_files[c(101:182)[which(niwo_test_list)]]
 
-plot(my_hs$band1_382nm, col = cividis(100), axes = FALSE, box = FALSE)
+my_hs <- hs_read(my_file, bands = c(1, 50, 100, 400))
+plot(my_hs, col = cividis(100), axes = FALSE, box = FALSE)
 
-mypts <- as(como_s2, "Spatial")
+plot(my_hs$band100_877nm, col = cividis(100), axes = FALSE, box = FALSE)
+plot(as(como_s2_prj, "Spatial"), add = TRUE, col = "green", cex = 3)
 
-my_vals <- hs_extract_pts(path_to_file, pts = como_s2_prj, bands = 1:426)
+como_s2_sp <- as(como_s2_prj, "Spatial")
+my_vals <- hs_extract_pts(my_file, pts = como_s2_sp, bands = 1:426)
+my_vals_df <- my_vals %>% st_as_sf() %>% 
+  st_drop_geometry() %>% as_tibble() %>%
+  pivot_longer(cols = starts_with('band'), 
+               names_to = 'band', 
+               values_to = 'reflectance') %>% 
+  tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
+  dplyr::mutate(wavelength = parse_number(wavelength))
 
-hs_extract_pts
-hs_wavelength
+my_vals_df %>%
+  ggplot(aes(wavelength, reflectance)) +
+  geom_line(lwd = 1) +
+  theme_bw() +
+  scale_color_viridis() +
+  ggtitle('COMO.AOS.S2 (NIWO) 2020')
+
+ggsave('figs/como2020.png')
+# hs_extract_pts
+# hs_wavelength
