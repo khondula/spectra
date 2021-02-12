@@ -10,11 +10,15 @@ shp_dir <- '../../DATA/spatial'
 swchem_sf <- glue('{shp_dir}/swchem_sites/swchem_sites.shp') %>%
   st_read()
 
-my_aq_site <- 'FLNT'
-my_aop_yr <- '2018'
-my_aop_site <- 'JERC'
-my_domain <- 'D03'
+my_aq_site <- 'BLDE'
+my_aop_yr <- '2020'
+my_aop_site <- 'YELL'
+my_domain <- 'D12'
 
+
+
+# save_spectra_df <- function(my_aq_site, my_aop_yr, my_aop_site, my_domain){
+  
 my_aq_sf <- dplyr::filter(swchem_sf, siteID == my_aq_site)
 
 my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
@@ -32,13 +36,17 @@ my_extent <- raster::extent(my_hs) %>%
   st_set_crs(proj4string(my_hs))
 
 # project sampling point
-my_aq_prj <- my_aq_sf %>% st_transform(st_crs(my_extent))
+my_aq_prj <- my_aq_sf %>% st_transform(proj4string(my_hs))
+path_to_file <- my_site_files[1]
+my_prj <- proj4string(my_hs)
 
 pt_in_img <- function(path_to_file){
-  my_hs <- hs_read(path_to_file, bands = c(1))
-  my_extent <- raster::extent(my_hs) %>% 
+  # my_hs <- hs_read(path_to_file, bands = c(1))
+  # my_extent <- raster::extent(my_hs) %>% 
+  my_extent <- hs_extent(path_to_file) %>%
     as("SpatialPolygons") %>% 
-    st_as_sf() %>% st_set_crs(proj4string(my_hs))
+    st_as_sf() %>% 
+    st_set_crs(my_prj)
   mat1 <- st_intersects(my_extent, my_aq_prj, sparse = FALSE)
   pts_in_extent <- which(apply(mat1, 1, any))
   pt_in_img <- my_extent[pts_in_extent,]
@@ -47,12 +55,15 @@ pt_in_img <- function(path_to_file){
 
 site_files_list <- my_site_files %>% purrr::map_lgl(~pt_in_img(.x))
 my_file <- my_site_files[which(site_files_list)]
+my_file <- my_file[1]
+# multiple files if there are multiple points... 
+
 
 # add in saving an image of where the point is? #
 my_hs <- hs_read(my_file, bands = c(1, 50, 100, 400))
 plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE)
 plot(as(my_aq_prj, "Spatial"), add = TRUE, col = "green", cex = 3)
-
+my_aq_prj
 # click_point <- raster::click(my_hs[[3]], n = 1, xy = TRUE)
 # shen_river_pt <- st_point(c(click_point[['x']], click_point[['y']])) %>% 
 #   st_sfc(crs = st_crs(my_aq_prj)) %>% st_as_sf()
@@ -77,10 +88,16 @@ my_vals_df %>% write_csv(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}.csv'))
 
 my_vals_df %>%
   ggplot(aes(wavelength, reflectance)) +
-  geom_line(lwd = 1) +
-  theme_bw() +
-  ylim(c(0, 0.1)) +
-  scale_color_viridis()
+  geom_line(lwd = 1, aes(col = nmdLctn)) +
+  coord_cartesian(ylim = c(0, 0.1),
+                  xlim = c(380, 1000)) +
+  theme_bw()
+# }
+
+# save_spectra_df(my_aq_site = 'PRLA', my_aop_yr = '2019', my_aop_site = 'WOOD', my_domain = 'D09')
+# save_spectra_df(my_aq_site = 'ARIK', my_aop_yr = '2020', my_aop_site = 'ARIK', my_domain = 'D10')
+# save_spectra_df(my_aq_site = 'BLDE', my_aop_yr = '2019', my_aop_site = 'YELL', my_domain = 'D12')
+# save_spectra_df(my_aq_site = 'BLDE', my_aop_yr = '2020', my_aop_site = 'YELL', my_domain = 'D12')
 
 ggsave('figs/shen-river2019.png')
 # hs_extract_pts
