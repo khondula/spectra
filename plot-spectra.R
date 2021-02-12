@@ -14,8 +14,11 @@ my_vals_df <- spectra_dir %>%
   
  
 my_vals_df %>% 
-  # dplyr::filter(reflectance > 0) %>%
   ggplot(aes(wavelength, reflectance)) +
-  geom_line(lwd = 1, aes(col = site)) +
-  theme_bw() +
-  scale_color_discrete_diverging("Tropic")
+  geom_line(lwd = 0.8, aes(col = nmdLctn)) +
+  # scale_color_discrete_diverging("") +
+  coord_cartesian(xlim = c(350, 1000), ylim = c(0, 0.1)) +
+  facet_wrap(vars(site)) +
+  theme_bw()
+
+ggsave('figs/spectra.png')
