@@ -10,12 +10,10 @@ shp_dir <- '../../DATA/spatial'
 swchem_sf <- glue('{shp_dir}/swchem_sites/swchem_sites.shp') %>%
   st_read()
 
-head(swchem_sf)
-
-my_aq_site <- 'COMO'
-my_aop_site <- 'NIWO'
-my_aop_yr <- '2020'
-my_domain <- 'D13'
+my_aq_site <- 'FLNT'
+my_aop_yr <- '2018'
+my_aop_site <- 'JERC'
+my_domain <- 'D03'
 
 my_aq_sf <- dplyr::filter(swchem_sf, siteID == my_aq_site)
 
@@ -25,6 +23,7 @@ my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
 my_site_files <- glue('{my_site_dir}/L3/Spectrometer/Reflectance') %>%
   fs::dir_ls(glob = '*.h5')
 
+# read in h5 file
 # read in just one to project sampling point
 my_hs <- hs_read(my_site_files[1], bands = c(1))
 my_extent <- raster::extent(my_hs) %>% 
@@ -49,11 +48,17 @@ pt_in_img <- function(path_to_file){
 site_files_list <- my_site_files %>% purrr::map_lgl(~pt_in_img(.x))
 my_file <- my_site_files[which(site_files_list)]
 
-#my_hs <- hs_read(my_file, bands = c(1, 50, 100, 400))
-#plot(my_hs, col = cividis(100), axes = FALSE, box = FALSE)
-
+# add in saving an image of where the point is? #
+my_hs <- hs_read(my_file, bands = c(1, 50, 100, 400))
 plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE)
 plot(as(my_aq_prj, "Spatial"), add = TRUE, col = "green", cex = 3)
+
+# click_point <- raster::click(my_hs[[3]], n = 1, xy = TRUE)
+# shen_river_pt <- st_point(c(click_point[['x']], click_point[['y']])) %>% 
+#   st_sfc(crs = st_crs(my_aq_prj)) %>% st_as_sf()
+
+# plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE)
+# plot(as(shen_river_pt, "Spatial"), add = TRUE, col = "green", cex = 3)
 
 my_aq_sp <- as(my_aq_prj, "Spatial")
 my_vals <- hs_extract_pts(my_file, pts = my_aq_sp, bands = 1:426)
@@ -74,8 +79,9 @@ my_vals_df %>%
   ggplot(aes(wavelength, reflectance)) +
   geom_line(lwd = 1) +
   theme_bw() +
+  ylim(c(0, 0.1)) +
   scale_color_viridis()
 
-ggsave('figs/como2020.png')
+ggsave('figs/shen-river2019.png')
 # hs_extract_pts
 # hs_wavelength
