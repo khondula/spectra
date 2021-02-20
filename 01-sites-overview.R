@@ -17,7 +17,19 @@ shp_dir <- '../../DATA/spatial'
 my_aq_site <- 'BLDE'
 my_aop_yr <- '2020'
 
-# save_my_plots <- 
+save_my_plots <- function(my_aq_site, my_aop_yr){
+  spectra_dir <- 'H:/DATA/spectra/'
+  shp_dir <- '../../DATA/spatial'
+  
+   get_aop_dates <- function(aq_siteids){
+    aop_file <- 'results/sites_join_aop_dates.csv'
+    aop_dates <- readr::read_csv(aop_file, col_types = 'ccccccccddD') %>%
+      dplyr::filter(siteID %in% aq_siteids) %>%
+      dplyr::select(siteID, aop_site_id, flightdate) %>%
+      dplyr::arrange(flightdate) %>% distinct()
+    return(aop_dates)
+  }
+  
 # AOP site name
 my_aop_site <- get_aop_dates(my_aq_site) %>% 
   pull(aop_site_id) %>% unique()
@@ -42,7 +54,19 @@ my_prj <- hs_epsg(my_site_files[1]) %>% as.integer()
 my_aq_prj <- my_aq_sf %>% st_transform(crs = my_prj)
 
 # identify which h5 file contains points SLOW
-# will need to update to look for file in table 
+# will need to update to look for file in table
+message('finding the right h5 file...')
+pt_in_img <- function(path_to_file){
+  my_extent <- hs_extent(path_to_file) %>%
+    as("SpatialPolygons") %>% 
+    st_as_sf() %>% 
+    st_set_crs(my_prj)
+  mat1 <- st_intersects(my_extent, my_aq_prj, sparse = FALSE)
+  pts_in_extent <- which(apply(mat1, 1, any))
+  pt_in_img <- my_extent[pts_in_extent,]
+  return(nrow(pt_in_img)>0)
+}
+
 site_files_list <- my_site_files %>% 
   purrr::map_lgl(~pt_in_img(.x))
 my_file <- my_site_files[which(site_files_list)]
@@ -95,9 +119,11 @@ my_sp_list <- my_loc_types %>%
   purrr::map(~as(.x, 'Spatial'))
 names(my_sp_list) <- my_loc_types
 
+message('making zoomed out image')
+
 pdf(glue('figs/maps/{my_aq_site}-{my_aop_yr}.pdf'))
 plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE,
-     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs_crop)[3]}'))
+     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs)[3]}'))
 if('S2' %in% my_loc_types){
   plot(my_sp_list[['S2']], add = TRUE, col = "green", cex = 3, pch = 3)
 }
@@ -114,10 +140,12 @@ if('outlet' %in% my_loc_types){
   plot(my_sp_list[['outlet']], add = TRUE, col = "cyan", cex = 1, pch = 4)
 }
 dev.off()
+
+message('making 100m image')
 
 pdf(glue('figs/maps/{my_aq_site}-{my_aop_yr}_100m.pdf'))
 plot(my_hs_crop100[[3]], col = cividis(100), axes = FALSE, box = FALSE,
-     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs_crop)[3]}'))
+     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs_crop100)[3]}'))
 if('S2' %in% my_loc_types){
   plot(my_sp_list[['S2']], add = TRUE, col = "green", cex = 3, pch = 3)
 }
@@ -135,9 +163,10 @@ if('outlet' %in% my_loc_types){
 }
 dev.off()
 
+message('making 30m image')
 pdf(glue('figs/maps/{my_aq_site}-{my_aop_yr}_30m.pdf'))
 plot(my_hs_crop30[[3]], col = cividis(100), axes = FALSE, box = FALSE,
-     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs_crop)[3]}'))
+     main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs_crop30)[3]}'))
 if('S2' %in% my_loc_types){
   plot(my_sp_list[['S2']], add = TRUE, col = "green", cex = 3, pch = 3)
 }
@@ -154,6 +183,42 @@ if('outlet' %in% my_loc_types){
   plot(my_sp_list[['outlet']], add = TRUE, col = "cyan", cex = 1, pch = 4)
 }
 dev.off()
+
+}
+
+save_my_plots('LEWI', '2019')
+save_my_plots('POSE', '2017')
+
+save_my_plots('FLNT', '2018')
+save_my_plots('SUGG', '2019')
+save_my_plots('CUPE', '2018')
+save_my_plots('GUIL', '2019')
+save_my_plots('CRAM', '2020')
+save_my_plots('LIRO', '2020')
+save_my_plots('KING', '2020')
+save_my_plots('MCDI', '2020')
+save_my_plots('LECO', '2018')
+save_my_plots('BWLA', '2019')
+save_my_plots('MAYF', '2019')
+save_my_plots('TOMB', '2019')
+save_my_plots('MAYF', '2019')
+save_my_plots('PRLA', '2020')
+save_my_plots('PRPO', '2020')
+save_my_plots('ARIK', '2020')
+save_my_plots('PRIN', '2017')
+save_my_plots('BLDE', '2020')
+save_my_plots('WLOU', '2020')
+save_my_plots('REDB', '2019')
+save_my_plots('MART', '2019')
+save_my_plots('MCRA', '2018')
+save_my_plots('BIGC', '2019')
+save_my_plots('TECR', '2019')
+save_my_plots('CARI', '2019')
+
+
+
+
+
 
 # extract spectra for point
 # identify adjacent cells? 
