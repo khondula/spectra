@@ -55,8 +55,10 @@ my_site_files %>%
          easting2 = easting + 1000,
          northing = as.numeric(str_sub(filename, 26, 32)),
          northing2 = northing + 1000) %>%
-  mutate(x_in_range = {{ my_x }} >= easting & {{ my_x }} <= easting2) %>%
-  head()
+  mutate(x_in_range = {{ my_x }} >= easting & {{ my_x }} <= easting2,
+         y_in_range = {{ my_y }} >= northing & {{ my_y }} <= northing2) %>%
+  dplyr::filter(x_in_range, y_in_range) %>% 
+  pull(filename)
 
 # which filename has range that contains pt coords
 
