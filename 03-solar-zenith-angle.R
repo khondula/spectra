@@ -44,13 +44,11 @@ my_x <- my_xy[['X']]
 my_y <- my_xy[['Y']]
 
 # find the right h5 file - assume file names are correct UTMs
-# which h5 file has point..
-# for each file name get yy range from northing + 1km
-# for each filename get xx range from easting + 1km
-my_site_files %>%
-  basename() %>%
+
+my_h5_file <- my_site_files %>%
   as.data.frame() %>% 
-  rename(filename = 1) %>%
+  rename(fullname = 1) %>%
+  mutate(filename = basename(fullname)) %>%
   mutate(easting = as.numeric(str_sub(filename, 19, 24)),
          easting2 = easting + 1000,
          northing = as.numeric(str_sub(filename, 26, 32)),
@@ -58,7 +56,16 @@ my_site_files %>%
   mutate(x_in_range = {{ my_x }} >= easting & {{ my_x }} <= easting2,
          y_in_range = {{ my_y }} >= northing & {{ my_y }} <= northing2) %>%
   dplyr::filter(x_in_range, y_in_range) %>% 
-  pull(filename)
+  pull(fullname)
 
-# which filename has range that contains pt coords
+my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
 
+# try to get zenith angle dataset
+my_h5$ls()
+
+zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_zenith_angle')
+zenith_raster <- my_h5[[zenith_path]]$read() %>% 
+  raster(template = )
+
+zenith_raster
+plot(zenith_raster)
