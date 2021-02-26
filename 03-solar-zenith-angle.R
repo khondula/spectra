@@ -65,7 +65,10 @@ my_h5$ls()
 
 zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_zenith_angle')
 zenith_raster <- my_h5[[zenith_path]]$read() %>% 
-  raster(template = )
+  raster()
 
 zenith_raster
 plot(zenith_raster)
+
+weather_path <- glue('{my_aop_site}/Reflectance/Metadata/Ancillary_Imagery/Weather_Quality_Indicator')
+weather_raster <- my_h5[[weather_path]]$read()
