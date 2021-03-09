@@ -41,6 +41,10 @@ my_aq_sf <- glue('{shp_dir}/swchem_sites/swchem_sites.shp') %>%
 my_loc_types <- my_aq_sf$location_type
 my_domain <- my_aq_sf$domanID[1]
 
+# check for which file has points??
+# whichh5 <- read_csv('results/which-h5.csv', col_types = 'cccccdc')
+
+
 # folder with AOP data
 my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
   fs::dir_ls(glob = glue("*{my_aop_site}*"), type = 'directory')
@@ -186,39 +190,12 @@ dev.off()
 
 }
 
-save_my_plots('LEWI', '2019')
-save_my_plots('POSE', '2017')
+# save_my_plots('COMO', '2019')
 
-save_my_plots('FLNT', '2018')
-save_my_plots('SUGG', '2019')
-save_my_plots('CUPE', '2018')
-save_my_plots('GUIL', '2019')
-save_my_plots('CRAM', '2020')
-save_my_plots('LIRO', '2020')
-save_my_plots('KING', '2020')
-save_my_plots('MCDI', '2020')
-save_my_plots('LECO', '2018')
-save_my_plots('BWLA', '2019')
-save_my_plots('MAYF', '2019')
-save_my_plots('TOMB', '2019')
-save_my_plots('MAYF', '2019')
-save_my_plots('PRLA', '2020')
-save_my_plots('PRPO', '2020')
-save_my_plots('ARIK', '2020')
-save_my_plots('PRIN', '2017')
-save_my_plots('BLDE', '2020')
-save_my_plots('WLOU', '2020')
-save_my_plots('REDB', '2019')
-save_my_plots('MART', '2019')
-save_my_plots('MCRA', '2018')
-save_my_plots('BIGC', '2019')
-save_my_plots('TECR', '2019')
-save_my_plots('CARI', '2019')
+# save zoomed in for just one point
 
 
-
-
-
+whichh5 <- read_csv('results/which-h5.csv', col_types = 'cccccdc')
 
 # extract spectra for point
 # identify adjacent cells? 

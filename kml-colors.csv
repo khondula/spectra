@@ -1,0 +1,4 @@
+color,condition,kml_color
+red,bad,ff0000ff
+yellow,okay,ff00ffff
+green,good,ff00ff00
