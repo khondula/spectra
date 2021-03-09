@@ -6,7 +6,7 @@ library(hdf5r)
 library(sf)
 library(tidyverse)
 library(glue)
-library(stars)
+# library(stars)
 source('R/myfxns.R')
 
 # set up
