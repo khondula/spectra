@@ -119,71 +119,41 @@ my_hs <- hs_read(my_h5_file, bands = c(1, 50, 100, 400))
 plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE,
      main = glue('{my_aq_site} {my_aop_yr} \n {names(my_hs)[3]}'))
 
-# buffer point
-
-my_aq_prj_buff30 <- st_buffer(my_aq_prj, 30)
-my_buff30_sp <- as(my_aq_prj_buff30, "Spatial")
-
-my_aq_prj_buff100 <- st_buffer(my_aq_prj, 100)
-my_buff100_sp <- as(my_aq_prj_buff100, "Spatial")
-
-my_hs_crop5 <- raster::crop(my_hs, my_buff5_sp)
-my_hs_crop30 <- raster::crop(my_hs, my_buff30_sp)
-my_hs_crop100 <- raster::crop(my_hs, my_buff100_sp)
-
-plot(my_hs_crop5[[3]], col = cividis(100), axes = FALSE, box = FALSE)
-
-plot(my_hs[[3]], col = cividis(100), axes = FALSE, box = FALSE)
-plot(my_hs_crop100[[3]], col = cividis(100), axes = FALSE, box = FALSE)
-plot(my_buff30_sp, add = TRUE, border = 'green', col = NA)
-plot(my_buff5_sp, add = TRUE, border = 'green', col = NA)
-plot(my_aq_prj_sp, add = TRUE, col = 'red', pch = 3)
 
 # extract spectra from pixels within the 5m buffered point
-my_hs
+my_h5
 library(terra)
-my_pts_spatvec1 <- my_aq_prj_sp %>% as('SpatVector')
+my_pt_spatvec <- my_aq_prj_sp %>% as('SpatVector')
 my_pts_spatvec <- my_buff5_sp %>% as('SpatVector')
 
-raster::extract(my_hs, my_aq_prj_sp)
+#raster::extract(my_h5, my_aq_prj_sp)
 
-my_hs <- hs_read(my_h5_file, bands = 1:200) # or 1:426
+# my_hs <- hs_read(my_h5_file, bands = 1:200) # or 1:426
 # this is slow. faster with terra?
 # didnt work with all bands...
-my_hs_terra <- my_hs %>% terra::rast()
-my_spectra <- terra::extract(my_hs_terra, my_pts_spatvec)
-my_spectra1 <- terra::extract(my_hs_terra, my_pts_spatvec1)
+names(my_h5) <- hs_wavelength(my_h5_file, bands = 1:100)
+
+my_hs_terra <- my_h5 %>% terra::rast()
+# find which cell the exact coords of sampling
+
+my_spectra <- terra::extract(my_hs_terra, my_pts_spatvec, cells = TRUE)
 my_spectra_df <- my_spectra %>% 
   as_tibble() %>%
-  rowid_to_column() %>%
-  group_by(rowid) %>%
+  group_by(cell) %>%
   pivot_longer(cols = starts_with('band'), 
                names_to = 'band', 
                values_to = 'reflectance') %>% 
   tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
   dplyr::mutate(wavelength = parse_number(wavelength))
-
-my_spectra_df1 <- my_spectra1 %>% 
-  as_tibble() %>%
-  rowid_to_column() %>%
-  group_by(rowid) %>%
-  pivot_longer(cols = starts_with('band'), 
-               names_to = 'band', 
-               values_to = 'reflectance') %>% 
-  tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
-  dplyr::mutate(wavelength = parse_number(wavelength))
-
-my_spectra_df %>% head()
 
 my_spectra_df %>%
   ggplot(aes(wavelength, reflectance)) +
-  geom_line(aes(group = rowid)) +
-  geom_line(data = my_spectra_df1, col = 'green', lwd = 2) +
-  # coord_cartesian(ylim = c(0, 0.1),
-  #                 xlim = c(380, 1000)) +
+  geom_line(aes(group = cell)) +
   theme_bw() +
-  theme(legend.position = 'none')
+  theme(legend.position = 'none') +
+  ggtitle(glue('{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0'))
 
+ggsave(glue('{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0.png'))
 ggsave('prpo2019-5mbuff-buoyc0.png')
 
 # make layers of cell IDs and or XYs
