@@ -1,8 +1,11 @@
-# chapter 5
+# chapter 6
 
 # ABSORPTION
-# eqn 5.1 - absorption coefficient of Non-algal particles
+# eqn 6 - absorption coefficient of phytoplankton chla
 # abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
+
+# specific phytoplankton absorbance
+# at 440 nm ranges 0.005 - 0.08 m2 mg-1
 
 # abs: absorption coefficient (m^-1)
 # wl: wavelength (lambda)
@@ -19,7 +22,7 @@ absREF <- 50
 spectra_min <- 300
 spectra_max <- 800
 
-calc_sm_absorb <- function(wl, absREF, wlREF = 400, SF = 0.0017){
+calc_sm_absorb <- function(wl, absREF, wlREF = 440, SF = 0.0017){
   abs_wl <- absREF * exp(-SF * (wl - wlREF))
   return(abs_wl)
 }
