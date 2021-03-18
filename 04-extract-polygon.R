@@ -18,12 +18,19 @@ spectra_dir <- 'H:/DATA/spectra_buff5m'
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'SUGG'
-my_aop_yr <- '2019'
+my_aq_site <- 'BARC'
+my_aop_yr <- '2018'
 my_loc_type <- 'buoy.c0'
 nbands <- 100
 
-# to get AOP name for AQ site
+
+save_spectra_buff5m <- function(my_aq_site, my_aop_yr,
+                                my_loc_type, nbands, max_y_refl = NA){
+  
+  # set up
+  spectra_dir <- 'H:/DATA/spectra_buff5m'
+  shp_dir <- 'H:/DATA/spatial'
+  # to get AOP name for AQ site
 my_aop_site <- 'results/sites_join_aop_dates.csv' %>%
   readr::read_csv(col_types = 'ccccccccddD') %>%
   dplyr::filter(siteID %in% my_aq_site) %>%
@@ -128,11 +135,11 @@ my_spectra_df %>%
   geom_line(aes(group = cell)) +
   geom_line(data = my_spectra_pt, col = 'green', lwd = 1) +
   theme_bw() +
-  # coord_cartesian(ylim = c(0, 0.1)) +
+  coord_cartesian(ylim = c(0, max_y_refl)) +
   theme(legend.position = 'none') +
   ggtitle(glue('{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0'))
 
-ggsave(glue('{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0.png'))
+ggsave(glue('figs/buff5m-spectra/{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0.png'))
 
 my_spectra_df %>% 
   write_csv(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}_{str_replace_all(my_loc_type, "[:punct:]", "")}-buff5m.csv'))
@@ -162,3 +169,40 @@ gg <- ggplot() +
   ggtitle(glue('{my_aq_site} {my_aop_yr} {my_loc_type}'))
 
 ggsave(glue('figs/buff5m-maps/{my_aq_site}_{my_aop_yr}_{str_replace_all(my_loc_type, "[:punct:]", "")}.pdf'), plot = gg, width = 10, height = 8)
+}
+
+save_spectra_buff5m('BARC', '2018', 'buoy.c0', 100)
+save_spectra_buff5m('BARC', '2019', 'buoy.c0', 100)
+#
+save_spectra_buff5m('SUGG', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('SUGG', '2018', 'buoy.c0', 100)
+save_spectra_buff5m('SUGG', '2019', 'buoy.c0', 100)
+#
+save_spectra_buff5m('CRAM', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('CRAM', '2019', 'buoy.c0', 100)
+#
+save_spectra_buff5m('PRLA', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('PRLA', '2019', 'buoy.c0', 100)
+save_spectra_buff5m('PRLA', '2020', 'buoy.c0', 100)
+
+save_spectra_buff5m('PRPO', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('PRPO', '2019', 'buoy.c0', 100)
+
+save_spectra_buff5m('LIRO', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('LIRO', '2020', 'buoy.c0', 100)
+
+save_spectra_buff5m('TOOK', '2017', 'buoy.c0', 100, 0.1)
+save_spectra_buff5m('TOOK', '2018', 'buoy.c0', 100, 0.1)
+#save_spectra_buff5m('TOOK', '2019', 'buoy.c0', 100)
+
+save_spectra_buff5m('FLNT', '2017', 'buoy.c0', 100)
+
+save_spectra_buff5m('BLWA', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('BLWA', '2018', 'buoy.c0', 100)
+save_spectra_buff5m('BLWA', '2019', 'buoy.c0', 100)
+
+save_spectra_buff5m('TOMB', '2017', 'buoy.c0', 100)
+save_spectra_buff5m('TOMB', '2018', 'buoy.c0', 100)
+save_spectra_buff5m('TOMB', '2019', 'buoy.c0', 100)
+
+save_spectra_buff5m('BLUE', '2017', 'buoy.c0', 100)
