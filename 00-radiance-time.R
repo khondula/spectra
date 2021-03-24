@@ -5,6 +5,7 @@ library(hdf5r)
 library(sf)
 library(tidyverse)
 library(glue)
+library(rhdf5)
 # library(terra)
 # library(stars)
 # library(scico)
@@ -84,6 +85,20 @@ my_h5_files <- 1:nrow(my_xys) %>%
 
 my_h5_file <- my_h5_files[1]
 
+file_h5 <- hdf5r::H5File$new(my_h5_file, mode = 'r')
+site <- file_h5$ls()$name
+obs_path <- glue::glue('{site}/Radiance/Metadata/Ancillary_Rasters/OBS_Data')
+my_obs <- file_h5[[obs_path]]
+my_obs$dims
+my_r <- my_obs$read()
+my_r[6, 1:10, 1:10]
+
+my_info <- h5readAttributes(my_h5_file, obs_path)
+?h5read
+obs1 <- h5read(my_h5_file, obs_path, index = list(1:10, 1:my_info$Dimensions[2], 1:my_info$Dimensions[1]))
+obs1_matrix <- matrix(obs1[8,,], nrow = 8264, ncol = 1017)
+my_r <- raster(obs1_matrix)
+plot(my_r)
 
 
 # read in and merge h5 files using hs_read
