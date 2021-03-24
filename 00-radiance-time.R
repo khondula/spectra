@@ -96,10 +96,13 @@ my_r[6, 1:10, 1:10]
 my_info <- h5readAttributes(my_h5_file, obs_path)
 ?h5read
 obs1 <- h5read(my_h5_file, obs_path, index = list(1:10, 1:my_info$Dimensions[2], 1:my_info$Dimensions[1]))
-obs1_matrix <- matrix(obs1[8,,], nrow = 8264, ncol = 1017)
+obs1_matrix <- matrix(obs1[10,,], nrow = 8264, ncol = 1017)
 my_r <- raster(obs1_matrix)
+ids <- values(my_r) == my_info$Data_Ignore_Value
+table(ids)
+my_r[ids] <- NA
 plot(my_r)
-
+range(values(my_r), na.rm = TRUE)
 
 # read in and merge h5 files using hs_read
 if(length(my_h5_files) == 1){
