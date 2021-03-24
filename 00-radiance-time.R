@@ -11,6 +11,7 @@ library(rhdf5)
 # library(scico)
 source('R/myfxns.R')
 
+
 # set up
 shp_dir <- 'H:/DATA/spatial'
 
@@ -88,33 +89,27 @@ my_h5_file <- my_h5_files[1]
 file_h5 <- hdf5r::H5File$new(my_h5_file, mode = 'r')
 site <- file_h5$ls()$name
 obs_path <- glue::glue('{site}/Radiance/Metadata/Ancillary_Rasters/OBS_Data')
-my_obs <- file_h5[[obs_path]]
-my_obs$dims
-my_r <- my_obs$read()
-my_r[6, 1:10, 1:10]
-
 my_info <- h5readAttributes(my_h5_file, obs_path)
-?h5read
-obs1 <- h5read(my_h5_file, obs_path, index = list(1:10, 1:my_info$Dimensions[2], 1:my_info$Dimensions[1]))
-obs1_matrix <- matrix(obs1[10,,], nrow = 8264, ncol = 1017)
-my_r <- raster(obs1_matrix)
-ids <- values(my_r) == my_info$Data_Ignore_Value
-table(ids)
-my_r[ids] <- NA
-plot(my_r)
-range(values(my_r), na.rm = TRUE)
 
-# read in and merge h5 files using hs_read
-if(length(my_h5_files) == 1){
-  my_h5 <- hs_read(my_h5_files, bands = 1:nbands)
-  names(my_h5) <- hs_wavelength(my_h5_files, bands = 1:nbands)
-}
-if(length(my_h5_files) > 1){
-  my_h5 <- hs_read(my_h5_files[1], bands = 1:nbands)
-  names(my_h5) <- hs_wavelength(my_h5_files, bands = 1:nbands)
-  my_hs_list <- purrr::map(my_h5_files, ~hs_read(.x, bands = 1:nbands))
-  for(i in 2:length(my_h5_files)){
-    my_h5 <- merge(my_h5, my_hs_list[[i]])
-  }
-}
+obs1 <- h5read(my_h5_file, obs_path, index = list(10, 1:my_info$Dimensions[2], 1:my_info$Dimensions[1]))
+obs1_matrix <- matrix(obs1[1,,], nrow = my_info$Dimensions[2], ncol = my_info$Dimensions[1])
+# save this for getting all obs data layers
+# my_stack <- purrr::map(1:10, ~matrix(obs1[.x,,], nrow = 8264, ncol = 1017)) %>%
+#   purrr::map(~raster(.x)) %>%
+#   stack()
+# ids <- values(my_stack[[1]]) == my_info$Data_Ignore_Value
+# my_stack[ids] <- NA
+
+my_r <- raster(obs1_matrix)
+ids <- values(my_r[[1]]) == my_info$Data_Ignore_Value
+my_r[ids] <- NA
+
+plot(my_r)
+
+# put the obs time raster in right map info
+# in order to be able to extract values for
+# site location coordinates
+
+# for multiple flight lines...
+# get time from relevant pixels for each date
 
