@@ -27,18 +27,26 @@ grab_path <- 'suva280_all.csv'
 grab_paths <- list(SUVA254 = 'suva254_all.csv',
                    SUVA280 = 'suva280_all.csv',
                    doc = 'doc_all.csv',
-                   tss = 'tss_all.csv')
+                   tss = 'tss_all.csv',
+                   chla = 'all-phyto-data.csv')
 
+my_analyte <- 'chla'
 
 get_closest_sample <- function(my_analyte){
   
-grab_path <-grab_paths[[my_analyte]]
-
-grab_df <- glue('../neon-sites/results/{grab_path}') %>% 
-  read_csv() %>%
-  dplyr::mutate(loc_type = substr(namedLocation, 10, nchar(namedLocation))) %>%
-  dplyr::filter(siteID %in% my_aq_site, loc_type %in% my_loc_type) %>%
-  filter(!is.na(analyteConcentration))
+  grab_path <-grab_paths[[my_analyte]]
+  
+  grab_df <- glue('../neon-sites/results/{grab_path}') %>% 
+    read_csv() %>%
+    dplyr::mutate(loc_type = substr(namedLocation, 10, nchar(namedLocation))) %>%
+    dplyr::filter(siteID %in% my_aq_site, loc_type %in% my_loc_type) %>%
+    filter(!is.na(analyteConcentration))
+  
+  if(my_analyte %in% c('chla')){
+    grab_df <- grab_df %>%
+      dplyr::select(-collectDate) %>%
+      dplyr::rename(collectDate = collect_date)
+  }
 
 # ggplot(grab_df, aes(x = collectDate, y = analyteConcentration)) +
 #   geom_vline(aes(xintercept = my_time), col = 'red') +
@@ -53,12 +61,12 @@ grab_df <- glue('../neon-sites/results/{grab_path}') %>%
 time_diff_df <- grab_df %>%
   dplyr::mutate(time_diff_days = difftime(collectDate, my_time, units = 'day')) %>% 
   mutate(time_diff_days = round(time_diff_days, 1)) %>% 
-  mutate(min_diff = time_diff_days == min(abs(time_diff_days))) %>%
-  dplyr::select(-uid)
+  mutate(min_diff = time_diff_days == min(abs(time_diff_days)))
 
 closest_sample <- time_diff_df %>% filter(min_diff)
 return(closest_sample)
 }
 
-my_analytes <- c('SUVA254', 'SUVA280', 'doc', 'tss')
-my_samps <- my_analytes %>% purrr::map_dfr(~get_closest_sample(.x))
+my_analytes <- c('SUVA254', 'SUVA280', 'doc', 'tss', 'chla')
+my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x))
+names(my_samps) <- my_analytes
