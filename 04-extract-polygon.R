@@ -137,9 +137,9 @@ my_spectra_df %>%
   theme_bw() +
   coord_cartesian(ylim = c(0, max_y_refl)) +
   theme(legend.position = 'none') +
-  ggtitle(glue('{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0'))
+  ggtitle(glue('{my_aq_site}-{my_aop_yr}-5mbuff-{str_replace_all(my_loc_type, "[:punct:]", "")}'))
 
-ggsave(glue('figs/buff5m-spectra/{my_aq_site}-{my_aop_yr}-5mbuff-buoyc0.png'))
+ggsave(glue('figs/buff5m-spectra/{my_aq_site}-{my_aop_yr}-5mbuff-{str_replace_all(my_loc_type, "[:punct:]", "")}.png'))
 
 my_spectra_df %>% 
   write_csv(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}_{str_replace_all(my_loc_type, "[:punct:]", "")}-buff5m.csv'))
@@ -199,10 +199,26 @@ save_spectra_buff5m('FLNT', '2017', 'buoy.c0', 100)
 
 save_spectra_buff5m('BLWA', '2017', 'buoy.c0', 100)
 save_spectra_buff5m('BLWA', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('BLWA', '2019', 'buoy.c0', 100)
+save_spectra_buff5m('BLWA', '2019', 'buoy.c0', 100, 0.1)
 
 save_spectra_buff5m('TOMB', '2017', 'buoy.c0', 100)
 save_spectra_buff5m('TOMB', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('TOMB', '2019', 'buoy.c0', 100)
+save_spectra_buff5m('TOMB', '2019', 'buoy.c0', 100, 0.1)
 
 save_spectra_buff5m('BLUE', '2017', 'buoy.c0', 100)
+
+
+save_spectra_buff5m('SYCA', '2019', 'S2', 100)
+
+save_spectra_buff5m('ARIK', '2017', 'S2', 100)
+save_spectra_buff5m('ARIK', '2020', 'S2', 100)
+
+save_spectra_buff5m('CARI', '2017', 'S2', 100)
+save_spectra_buff5m('CARI', '2018', 'S2', 100)
+save_spectra_buff5m('CARI', '2019', 'S2', 100)
+
+save_spectra_buff5m('TECR', '2019', 'S2', 100)
+
+save_spectra_buff5m('MART', '2017', 'S2', 100)
+save_spectra_buff5m('MART', '2018', 'S2', 100)
+save_spectra_buff5m('MART', '2019', 'S2', 100)
