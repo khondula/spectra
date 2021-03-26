@@ -1,7 +1,7 @@
 # function to get hs_extent from radiance data
 
-filename <- my_site_files[2]
-producttype <- 'Radiance'
+# filename <- my_site_files[2]
+# producttype <- 'Radiance'
 
 hs_mapinfo <- function(filename, producttype = 'Radiance'){
   file_h5 <- hdf5r::H5File$new(filename, mode = 'r')
@@ -10,7 +10,8 @@ hs_mapinfo <- function(filename, producttype = 'Radiance'){
   map_info <- file_h5[[mapinfo_path]]$read()
   map_info <- stringr::str_split(map_info, ',') %>% unlist()
   
-  dims_path <- glue::glue('{site}/{producttype}/RadianceIntegerPart')
+  dims_path <- glue::glue('{site}/{producttype}/Radiance_Data')
+  # dims_path <- glue::glue('{site}/{producttype}/RadianceIntegerPart')
   my_dims <- file_h5[[dims_path]]$dims
   xy_res <- c(map_info[2] %>% as.numeric(),
               map_info[3] %>% as.numeric())
@@ -26,4 +27,4 @@ hs_mapinfo <- function(filename, producttype = 'Radiance'){
   return(map_info_list)
 }
 
-my_site_files %>% purrr::map(~hs_mapinfo(.x, 'Radiance'))
+# my_site_files %>% purrr::map(~hs_mapinfo(.x, 'Radiance'))
