@@ -16,10 +16,11 @@ source('R/hs_mapinfo.R')
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'BLWA'
-my_aop_yr <- '2017'
+my_aq_site <- 'PRLA'
+my_aop_yr <- '2019'
 my_loc_type <- 'buoy.c0'
 
+# save_radiance_times <- function(my_aq_site, my_aop_yr, my_loc_type){}
 # to get AOP name for AQ site
 my_aop_site <- 'results/sites_join_aop_dates.csv' %>%
   readr::read_csv(col_types = 'ccccccccddD') %>%
@@ -67,6 +68,7 @@ my_site_files_df <- my_site_files %>%
          xmax = purrr::map_dbl(fullname, ~hs_mapinfo(.x, 'Radiance')[['xmax']]),
          ymin = purrr::map_dbl(fullname, ~hs_mapinfo(.x, 'Radiance')[['ymin']]),
          ymax = purrr::map_dbl(fullname, ~hs_mapinfo(.x, 'Radiance')[['ymax']]))
+
 
 find_which_file <- function(my_id){
   my_x <- my_xys[['X']][my_id]
@@ -142,4 +144,6 @@ extract_gpstime <- function(my_h5_file, my_aq_prj_sp){
 
 
 times_df <- my_h5_files %>% purrr::map_dfr(~extract_gpstime(.x, my_aq_prj_sp))
-times_df
+
+rad_times_dir <- 'H:/DATA/radiance-time'
+times_df %>% write_csv(glue('{rad_times_dir}/{my_aq_site}-{my_aop_yr}_radianceTime.csv'))

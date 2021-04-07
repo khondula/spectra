@@ -10,8 +10,11 @@ hs_mapinfo <- function(filename, producttype = 'Radiance'){
   map_info <- file_h5[[mapinfo_path]]$read()
   map_info <- stringr::str_split(map_info, ',') %>% unlist()
   
-  dims_path <- glue::glue('{site}/{producttype}/Radiance_Data')
-  # dims_path <- glue::glue('{site}/{producttype}/RadianceIntegerPart')
+  # add in line here to check for which name is used for radiance data
+  # hdf5r::list.datasets(my_h5) 
+  
+  # dims_path <- glue::glue('{site}/{producttype}/Radiance_Data')
+  dims_path <- glue::glue('{site}/{producttype}/RadianceIntegerPart')
   my_dims <- file_h5[[dims_path]]$dims
   xy_res <- c(map_info[2] %>% as.numeric(),
               map_info[3] %>% as.numeric())
