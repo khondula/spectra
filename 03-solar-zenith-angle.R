@@ -4,6 +4,8 @@ library(hdf5r)
 library(tidyverse)
 library(glue)
 library(neonhs)
+library(sf)
+library(raster)
 
 # set up
 source('R/myfxns.R')
@@ -70,5 +72,15 @@ zenith_raster <- my_h5[[zenith_path]]$read() %>%
 zenith_raster
 plot(zenith_raster)
 
-weather_path <- glue('{my_aop_site}/Reflectance/Metadata/Ancillary_Imagery/Weather_Quality_Indicator')
-weather_raster <- my_h5[[weather_path]]$read()
+# mask to buffered point
+# add layers for x and y coords
+# extract 
+# save
+my_aq_sf
+
+# weather_path <- glue('{my_aop_site}/Reflectance/Metadata/Ancillary_Imagery/Weather_Quality_Indicator')
+# weather_raster <- my_h5[[weather_path]]$read()
+# as.raster(weather_raster[3,,]) %>% str()
+# str(weather_raster)
+# weather_raster[1,,]
+# ?as.raster.array

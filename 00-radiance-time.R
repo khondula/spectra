@@ -1,10 +1,13 @@
-# library(neonhs)
+# install.packages('BiocManager')
+# BiocManager::install('rhdf5')
+library(neonhs)
 # library(viridis)
 library(raster)
 library(hdf5r)
 library(sf)
 library(tidyverse)
 library(glue)
+library(lubridate)
 library(rhdf5)
 # library(terra)
 # library(stars)
@@ -16,11 +19,14 @@ source('R/hs_mapinfo.R')
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'PRLA'
-my_aop_yr <- '2019'
+my_aq_site <- 'LIRO'
+my_aop_yr <- '2020'
 my_loc_type <- 'buoy.c0'
 
-# save_radiance_times <- function(my_aq_site, my_aop_yr, my_loc_type){}
+save_radiance_times(my_aq_site = 'PRLA', '2020', 'buoy.c0')
+save_radiance_times(my_aq_site = 'PRPO', '2020', 'buoy.c0')
+
+save_radiance_times <- function(my_aq_site, my_aop_yr, my_loc_type){
 # to get AOP name for AQ site
 my_aop_site <- 'results/sites_join_aop_dates.csv' %>%
   readr::read_csv(col_types = 'ccccccccddD') %>%
@@ -88,7 +94,7 @@ my_h5_files <- 1:nrow(my_xys) %>%
 ### extract time from OBS raster
 ### for each file overlapping point
 
-my_h5_file <- my_h5_files[1]
+# my_h5_file <- my_h5_files[1]
 
 extract_gpstime <- function(my_h5_file, my_aq_prj_sp){
   file_h5 <- hdf5r::H5File$new(my_h5_file, mode = 'r')
@@ -147,3 +153,4 @@ times_df <- my_h5_files %>% purrr::map_dfr(~extract_gpstime(.x, my_aq_prj_sp))
 
 rad_times_dir <- 'H:/DATA/radiance-time'
 times_df %>% write_csv(glue('{rad_times_dir}/{my_aq_site}-{my_aop_yr}_radianceTime.csv'))
+}
