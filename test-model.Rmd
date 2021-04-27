@@ -8,14 +8,20 @@ editor_options:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+```{r}
+library(glue)
+library(tidyverse)
+library(readxl)
+```
+
 
 # Bio-Optical Model
 
 This is a test. 
 
 ```{r}
-my_aq_site <- 'BARC'
-my_aop_yr <- '2019
+my_aq_site <- "BARC"
+my_aop_yr <- "2019"
 ```
 
 ## Reflectance Spectra
@@ -27,7 +33,7 @@ spectra_file <- fs::dir_ls(spectra_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"
 spectra_df <- read_csv(spectra_file)
 my_spectra_pt <- spectra_df %>% filter(my_cellid)
 
-spectra_df %>%
+rrs <- spectra_df %>%
   ggplot(aes(wavelength, reflectance)) +
   geom_line(aes(group = cell)) +
   geom_line(data = my_spectra_pt, col = "green", lwd = 1) +
@@ -84,11 +90,14 @@ bw is scattering coefficient
 ```{r}
 
 abs_water_list <- dplyr::select(abs_water, absorb_m1) %>% 
-  purrr::transpose(.names = glue('wl{abs_water$wl}'))
+  purrr::transpose(.names = glue('wl{abs_water$wl}')) %>%
+  purrr::map(~as.numeric(unlist(.x)))
 abs_water_list$wl300
 
 backs_water_list <- dplyr::select(backs_water, backs_m1) %>% 
-  purrr::transpose(.names = glue('wl{backs_water$wl}'))
+  purrr::transpose(.names = glue('wl{backs_water$wl}')) %>%
+  purrr::map(~as.numeric(unlist(.x)))
+
 backs_water_list$wl300
 
 my_wavelengths_water <- abs_water %>% 
@@ -149,7 +158,7 @@ my_radtime
 ```{r}
 source("R/get-closest-sample.R")
 my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
-my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x))
+my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x, my_time = my_radtime))
 names(my_samps) <- my_analytes
 
 map(my_samps, ~pull(.x, time_diff_days))
@@ -208,7 +217,8 @@ astarPHY_df <- astarPHY %>%
 
 abs_phy <- astarPHY_df %>%
   dplyr::select(abs_phy) %>% 
-  purrr::transpose(.names = glue('wl{astarPHY_df$nm}'))
+  purrr::transpose(.names = glue('wl{astarPHY_df$nm}')) %>%
+  purrr::map(~as.numeric(unlist(.x)))
 ```
 
 
@@ -296,7 +306,9 @@ my_spectra %>%
   ggtitle(glue("CDOM absorbance {my_aq_site} {my_aop_yr}"))
 
 abs_cdom <- dplyr::select(my_spectra, value) %>% 
-  purrr::transpose(.names = glue('wl{my_spectra$wavelength}'))
+  purrr::transpose(.names = glue('wl{my_spectra$wavelength}')) %>%
+  purrr::map(~as.numeric(unlist(.x)))
+abs_cdom$wl382
 ```
 
 ## Non-algal suspended matter absorbance
@@ -343,13 +355,98 @@ C_mu0 = -0.629 * mu0 + 0.975
 surface_factor = 0.544
 ```
 
+
 ```{r}
-# absorb[] = abs_water[] + abs_phyto[] + abs_cdom[] + abs_sm[]
-# backs[] = backs_water[] + backs_phyto[] + backs_sm[]
+names(abs_water_list)
+# absorb[] = abs_water_list[] + abs_phyto[] + abs_cdom[] + abs_sm[]
+# backs[] = backs_water_list[] + backs_phyto[] + backs_sm[]
 # rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
 ```
 
-Convert rD[] to data frame
+No TSS so ignore for now
+
+Thought I was being fancy with the lists but cant figure out list_merge
+
+```{r}
+
+names(abs_water_list) %>% length()
+names(abs_phy) %>% length()
+names(abs_cdom) %>% length()
+
+abs_water_list$wl382
+abs_phy$wl382
+abs_cdom$wl382
+
+Awater_df <- flatten_df(abs_water_list) %>% 
+  tidyr::pivot_longer(cols = 1:251, 
+                      names_to = "wl", values_to = "abs_water")
+Aphy_df <- astarPHY_df %>% dplyr::select(nm, abs_phy) %>% 
+  mutate(wl = glue("wl{nm}")) %>% dplyr::select(wl, abs_phy)
+Acdom_df <- my_spectra %>% 
+  mutate(wl = glue("wl{wavelength}")) %>%
+  dplyr::select(wl, value) %>% rename(abs_cdom = value)
+
+abs_df <- Awater_df %>% 
+  left_join(Aphy_df, by = c("wl")) %>%
+  left_join(Acdom_df, by = c("wl")) %>%
+  mutate(abs_total = abs_water + abs_phy + abs_cdom)
+
+Bwater_df <- flatten_df(backs_water_list) %>% 
+  tidyr::pivot_longer(cols = 1:251, 
+                      names_to = "wl", values_to = "backs_water")
+# Bphy_df <- BstarPHY_df %>% dplyr::select(nm, abs_phy) %>% 
+#   mutate(wl = glue("wl{nm}")) %>% dplyr::select(wl, abs_phy)
+
+model_df <- abs_df %>% 
+  left_join(Bwater_df) %>%
+  mutate(rD = 0.544 * C_mu0 * (backs_water/ (abs_total + backs_water)))
+
+# absorb[] = abs_water_list[] + abs_phyto[] + abs_cdom[]
+# backs[] = backs_water_list[] + backs_phyto[]
+# rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
+```
+
 
 and plot!
+
+```{r}
+# rrs
+model_df2 <- model_df %>%
+  mutate(wl = str_replace(wl, "wl", "")) %>%
+  mutate(wl = as.numeric(wl)) %>% 
+  dplyr::filter(wl >= min(my_spectra$wavelength),
+                wl <= max(my_spectra$wavelength))
+
+rrd <- model_df2 %>%
+  ggplot(aes(x = wl, y = rD)) +
+  geom_line() +
+  theme_bw() +
+  ylab("Modeled Reflectance \n(just above water surface)") +
+  xlab("Wavelength (nm)")
+
+ab <- my_spectra_pt %>%
+  left_join(model_df2, by = c("wavelength" = "wl")) %>%
+  dplyr::select(wavelength, reflectance, rD) %>%
+  ggplot(aes(x = reflectance, y = rD)) +
+  geom_abline(slope = 1, intercept = 0, lty = 2) +
+  geom_point(pch = 21, aes(fill = wavelength), size = 3) +
+  scale_fill_viridis_c(direction = -1, name = "wl (nm)") +
+  theme_bw() +
+  theme(legend.position = c(0.99, 0.01),
+        legend.justification = c(1, 0))
+
+ab2 <- my_spectra_pt %>%
+  left_join(model_df2, by = c("wavelength" = "wl")) %>%
+  dplyr::select(wavelength, reflectance, rD) %>%
+  mutate(rD_resid = rD - reflectance) %>%
+  ggplot(aes(x = wavelength, y = rD_resid)) +
+  geom_hline(aes(yintercept = 0), lty = 2) +
+  geom_point(pch = 21, fill = "red", size = 3) +
+  ylab("rD - Rrs") +
+  theme_bw()
+
+abcd <- cowplot::plot_grid(rrs, rrd, ab, ab2)
+abcd
+# cowplot::save_plot("figs/test-model.png", abcd)
+```
 
