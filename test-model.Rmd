@@ -50,29 +50,36 @@ abs_water = data.frame(wl = water3$lambda_nm,
                        absorb_m1 = water3$absorption_m1)
 
 backs_water = data.frame(wl = water3$lambda_nm,
-                         backs_m1 = water3$scattering_m1)
+                         backs_m1 = 0.5*(water3$scattering_m1))
 
-aa <- ggplot(backs_water, aes(x = wl, y = backs_m1)) + 
-  geom_point() + 
-  geom_vline(aes(xintercept = my_wavelengths[1])) +
-  geom_vline(aes(xintercept = my_wavelengths[100]))
 
-bb <- ggplot(abs_water, aes(x = wl, y = absorb_m1)) + 
+aa <- ggplot(abs_water, aes(x = wl, y = absorb_m1)) + 
   geom_point() +
-  geom_vline(aes(xintercept = my_wavelengths[1])) +
-  geom_vline(aes(xintercept = my_wavelengths[100]))
+  scale_y_log10() +
+  # geom_vline(aes(xintercept = 700), col = "red") +
+  geom_vline(aes(xintercept = my_wavelengths_rs[1])) +
+  geom_vline(aes(xintercept = my_wavelengths_rs[100]))
+
+bb <- ggplot(backs_water, aes(x = wl, y = backs_m1)) + 
+  geom_point() + 
+  geom_vline(aes(xintercept = my_wavelengths_rs[1])) +
+  geom_vline(aes(xintercept = my_wavelengths_rs[100]))
 
 cowplot::plot_grid(aa, bb)
 
 ```
 
 Can only model up to 800 nm based on extent of absorbance and backscattering
-spectra for water. 
+spectra for water. (More absorbance data in Fewell)
 
 Need to interpolate water spectra to wavelengths of rs data. 
 For now model abs and backs based on water wavelengths
 
 Convert to list so abs_water[[300]] is value? 
+
+backscattering coefficient is HALF of scattering coefficient
+bbw = 0.5*bw
+bw is scattering coefficient
 
 ```{r}
 
@@ -137,34 +144,212 @@ my_radtime <- radtimes_df$datetime
 my_radtime
 ```
 
+## In situ data 
+
+```{r}
+source("R/get-closest-sample.R")
+my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
+my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x))
+names(my_samps) <- my_analytes
+
+map(my_samps, ~pull(.x, time_diff_days))
+```
+
+
 
 ## Phytoplankton Absorbance
 
 chl conc (mg/L) * specific absorption
 
+chla = sum of chl a AND pheophytin mg/L
+
+specific absorption coefficients from Gege WASI program
+
+Packaging effect: see Equation 2.39 (Bricaud et al 1995) 
+
+m2/mg * ug/L = 1/m
+
+```{r}
+chla_df <- my_samps$chla
+chla_mgL <- chla_df$analyteConcentration %>% sum()
+chla_ugL = chla_mgL/1000
+
+astarPHY <- read_csv("data/gege-wasi-spectra.csv")
+
+astarPHY %>%
+  pivot_longer(cols = 2:7, names_to = "class", values_to = "abs_m2_per_mg") %>%
+  ggplot(aes(x = nm, y = abs_m2_per_mg)) +
+  geom_line(aes(col = class), lwd = 1) +
+  theme_bw() +
+  coord_cartesian(xlim = c(380, 800)) +
+  theme(legend.title = element_blank()) +
+  scale_color_viridis_d() +
+  xlab("Wavelength (nm)") +
+  ylab("a*phy (m2 per mg)") +
+  geom_vline(aes(xintercept = min(my_wavelengths_water))) +
+  geom_vline(aes(xintercept = max(my_wavelengths_water))) +
+  theme(legend.position = c(0.99,0.99), legend.justification = c(1,1)) +
+  ggtitle("Chl-a specific absorption coefficients")
+
+```
+
+Use just phyto_mixA for now
+
+```{r}
+my_wavelengths_water
+astarPHY_df <- astarPHY %>% 
+  dplyr::filter(nm >= min(my_wavelengths_water),
+                nm <= max(my_wavelengths_water)) %>%
+  dplyr::select(nm, phyto_mixA) %>%
+  mutate(abs_phy = phyto_mixA*chla_ugL)
+
+# astarPHY_df %>%
+#   ggplot(aes(x = nm, y = abs_phy)) + geom_line()
+
+abs_phy <- astarPHY_df %>%
+  dplyr::select(abs_phy) %>% 
+  purrr::transpose(.names = glue('wl{astarPHY_df$nm}'))
+```
+
+
 ## CDOM absorbance
 
+eqn 4.1 - absorption coefficient of CDOM
+
+abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
+
+* abs: absorption coefficient (m^-1)
+* wl: wavelength (lambda)
+* wlREF: reference wavelength
+   commonly 380, 400, 420
+   or 412, 443 (central wavelength of satellite bands)
+* SF: slope factor
+   **indicator of MW, source, etc**
+   
+SUVA 254 = abs[254]/DOC
+absREF is absorbance at reference wavelength
+
+*Slope factor shouldn't be calculated between 254 and 280 but for logistics
+assume that absorbance spectra will be determined based on doc and suvas*
+
+```{r}
+cdom_df <- my_samps$doc
+
+my_samps$SUVA254
+my_samps$SUVA280
+my_samps$doc
+
+
+my_suva254 = my_samps$SUVA254$analyteConcentration
+my_suva280 = my_samps$SUVA280$analyteConcentration
+my_doc = my_samps$doc$analyteConcentration
+
+abs254 = my_suva254 * my_doc
+abs254
+abs280 = my_suva280 * my_doc
+abs280
+
+my_doc
+my_suva254
+my_suva280
+```
+
+```{r}
+# spectra_min <- min(my_wavelengths_water)
+# spectra_max <- max(my_wavelengths_water)
+
+calc_cdom_absorb <- function(wl, absREF, wlREF = 400, SF = 0.0017){
+  abs_wl <- absREF * exp(-SF * (wl - wlREF))
+  return(abs_wl)
+}
+
+calc_cdom_spectra <- function(absREF, 
+                              spectra_id, 
+                              spectra_min = min(my_wavelengths_water), 
+                              spectra_max = max(my_wavelengths_water),
+                              wlREF = 400, SF = 0.0017){
+  wl_range <- spectra_min:spectra_max
+  cdom_spectra <- wl_range %>% 
+    purrr::map_dbl(~calc_cdom_absorb(.x, absREF, wlREF, SF)) %>%
+    as_tibble() %>%
+    mutate(wavelength = wl_range) %>%
+    mutate(wavelength = as.numeric(wavelength)) %>%
+    mutate(spectra_id = spectra_id, wlREF = wlREF, SF = SF)
+  return(cdom_spectra)
+}
+
+my_sf = log(abs280/abs254)/(-(280-254))
+
+my_spectra <- calc_cdom_spectra(abs254, 
+                                spectra_min = min(my_wavelengths_water), 
+                                spectra_max = max(my_wavelengths_water),
+                                wlREF = 254,
+                                spectra_id = glue("{my_aq_site} {my_aop_yr}"), 
+                                SF = my_sf)
+my_spectra %>%
+  mutate(wlREF = forcats::as_factor(wlREF)) %>%
+  ggplot(aes(x = wavelength, y = value, group = wlREF)) +
+  geom_line(aes(col = wlREF)) + 
+  geom_point(aes(x = 254, y = abs254)) +
+  geom_point(aes(x = 280, y = abs280)) +
+  theme_bw() +
+  ggtitle(glue("CDOM absorbance {my_aq_site} {my_aop_yr}"))
+
+abs_cdom <- dplyr::select(my_spectra, value) %>% 
+  purrr::transpose(.names = glue('wl{my_spectra$wavelength}'))
+```
 
 ## Non-algal suspended matter absorbance
 
 suspended matter conc (mg/L) * specific absorption
 
+mg/L * m2/g = 1/m
+
+```{r}
+bstarSM = 0.0086 # m2 per g
+tss_mgL = my_samps$tss$analyteConcentration
+tss_mgL
+
+```
+
 ## Phytoplankton backscattering
+
+```{r}
+chla_df <- my_samps$chla
+```
+
+## Non-algal suspended matter backscattering
+
+suspended matter conc (mg/L) * specific backscattering 
+
+Constant value of specific backscattering coeffic of suspended matter
+as per Albert and Mobley 2003, from Lake Constance data
+
+```{r}
+bstarSM = 0.0086 # m2 per g
+tss_mgL = my_samps$tss$analyteConcentration
+tss_mgL
+
+backs_sm <- bstarSM*tss_mgL
+```
+
 
 ## Model 
 
-```{r}
-# abs_phyto[] = 
-# absorb = abs_water[] + abs_phyto[] + abs_cdom[] + abs_sm[]
-
-```
+Equation 4.4 in book
 
 ```{r}
 C_mu0 = -0.629 * mu0 + 0.975
 surface_factor = 0.544
-
 ```
 
+```{r}
+# absorb[] = abs_water[] + abs_phyto[] + abs_cdom[] + abs_sm[]
+# backs[] = backs_water[] + backs_phyto[] + backs_sm[]
+# rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
+```
 
+Convert rD[] to data frame
 
+and plot!
 
