@@ -1,11 +1,12 @@
 ---
+title: "Bio-Optical Model"
 output: html_document
 editor_options: 
   chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
 ```
 
 ```{r}
@@ -14,17 +15,15 @@ library(tidyverse)
 library(readxl)
 ```
 
-
-# Bio-Optical Model
-
 This is a test. 
 
 ```{r}
-my_aq_site <- "BARC"
+my_aq_site <- "SUGG"
 my_aop_yr <- "2019"
+my_loc_type <- 'buoy.c0'
 ```
 
-## Reflectance Spectra
+## Measured Reflectance Spectra
 
 ```{r}
 spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
@@ -40,14 +39,52 @@ rrs <- spectra_df %>%
   theme_bw() +
   coord_cartesian(ylim = c(0, 0.1)) +
   theme(legend.position = "none")
+rrs + ggtitle(glue("Measured reflectance at {my_aq_site} {my_loc_type} {my_aop_yr}"))
 
 ```
 
 ```{r}
 my_wavelengths_rs <- my_spectra_pt$wavelength
+range(my_wavelengths_rs)
 ```
 
-## Water Spectra
+> TODO: striping at the lowest measured wavelengths?
+> TODO: errors for PRLA (2017, 2019, 2020) and PRPO (2017) spectra
+> TODO: BLUE 2017 (spectra S2 point in the tree canopy)
+> TODO: TOOK 2019 reflectance not published
+> TODO: FLNT 2019 reflectance not published
+> TODO: curate reflectance at stream sites. look at pics. case 1? 
+
+## Water Properties
+
+Can only model up to 800 nm based on extent of absorbance and backscattering
+spectra for water. (More absorbance data in Fewell?)
+
+Need to interpolate water spectra to wavelengths of rs data. 
+For now model abs and backs based on water wavelengths
+
+backscattering coefficient is assumed HALF of scattering coefficient
+bbw = 0.5*bw
+bw is scattering coefficient
+
+> absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
+
+> Pope and Fry 1997 (absorption 380-700 nm)
+
+* 2.5 nm resolution, also gives standard deviations
+* Comparison plot (Figure 10) to Buiteveld et al, Tam and Patel, Smith and Baker, and Sogandares and Fry
+
+> Buiteveld 1994 (absorption and scattering 300-800 nm)
+
+* H.Buiteveld, J.H.M. Hakvoort, and M.Donze, “The optical properties of pure water,” in Ocean Optics XII, Proc. SPIE 2258, 174-183 (1994). 
+* Table 1 has absorption and scattering coefficients at 20 C, also a proposed temperature dependence (A = absorption increment due to temperature) 
+
+> Bukata CRC book table 4.1 (absorption and scattering 250-800 nm)
+
+* Optical properties of pure water from multi-author Optics of the Ocean (Russian) 1983 and Smith and Baker 
+
+> Sogandares and Fry 1997 (Absorption and uncertainty for 10 nm increments 340 to 640 nm)
+
 
 ```{r}
 water3 <- read_excel("../../data/water-spectra/water-spectra-buiteveld94.xlsx")
@@ -60,79 +97,88 @@ backs_water = data.frame(wl = water3$lambda_nm,
 
 
 aa <- ggplot(abs_water, aes(x = wl, y = absorb_m1)) + 
-  geom_point() +
   scale_y_log10() +
-  # geom_vline(aes(xintercept = 700), col = "red") +
-  geom_vline(aes(xintercept = my_wavelengths_rs[1])) +
-  geom_vline(aes(xintercept = my_wavelengths_rs[100]))
+  geom_ribbon(aes(xmin = min(my_wavelengths_rs),
+                xmax = max(my_wavelengths_rs)),
+            fill = "green", alpha = 0.2) +
+  geom_point() +
+  geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
+  geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
+  ggtitle("Aborption by water (Buiteveld 94)") + theme_bw()
 
 bb <- ggplot(backs_water, aes(x = wl, y = backs_m1)) + 
+  geom_ribbon(aes(xmin = min(my_wavelengths_rs),
+                xmax = max(my_wavelengths_rs)),
+            fill = "green", alpha = 0.2) +
   geom_point() + 
-  geom_vline(aes(xintercept = my_wavelengths_rs[1])) +
-  geom_vline(aes(xintercept = my_wavelengths_rs[100]))
+  geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
+  geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
+  ggtitle("1/2 scattering by water (Buiteveld 94") + theme_bw()
 
 cowplot::plot_grid(aa, bb)
 
 ```
 
-Can only model up to 800 nm based on extent of absorbance and backscattering
-spectra for water. (More absorbance data in Fewell)
-
-Need to interpolate water spectra to wavelengths of rs data. 
-For now model abs and backs based on water wavelengths
-
-Convert to list so abs_water[[300]] is value? 
-
-backscattering coefficient is HALF of scattering coefficient
-bbw = 0.5*bw
-bw is scattering coefficient
+Plots show range of reflectance data
 
 ```{r}
-
-abs_water_list <- dplyr::select(abs_water, absorb_m1) %>% 
+abs_water_list <- dplyr::select(abs_water, absorb_m1) %>%
   purrr::transpose(.names = glue('wl{abs_water$wl}')) %>%
   purrr::map(~as.numeric(unlist(.x)))
-abs_water_list$wl300
-
-backs_water_list <- dplyr::select(backs_water, backs_m1) %>% 
+# abs_water_list$wl300
+# 
+backs_water_list <- dplyr::select(backs_water, backs_m1) %>%
   purrr::transpose(.names = glue('wl{backs_water$wl}')) %>%
   purrr::map(~as.numeric(unlist(.x)))
+# 
+# backs_water_list$wl300
 
-backs_water_list$wl300
-
+# crop wavelengths for water to range of reflectance data
+# (only affects low end)
 my_wavelengths_water <- abs_water %>% 
-  filter(wl %in% seq(range(my_wavelengths_rs)[1], range(my_wavelengths_rs)[2])) %>%
+  filter(wl %in% seq(range(my_wavelengths_rs)[1], 
+                     range(my_wavelengths_rs)[2])) %>%
   pull(wl)
-
-backs_water_list[["wl402"]]
-abs_water_list[["wl402"]]
 
 ```
 
-
+> TODO: Rescale water spectra to wavelengths of rs data of vice versa
 
 ## Solar zenith angle
 
+Eqn. 4.2 describes irradiance reflectance just below water surface,
+function of total absorption, total backscattering, and *C* which
+depends on solar zenith angle. *C* is a function of the cosine of the
+zenith angle of refracted photons ($mu_0$). 
+
+$C(mu_0)$ = -0.629$mu_0$ + 0.975
+
 ```{r}
-zenith_dir <- "/Volumes/hondula/DATA/zenith-angles/"
+zenith_dir <- "/Volumes/hondula/DATA/zenith-angles"
 zenith_file <- fs::dir_ls(zenith_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
 
 zenith_df <- read_csv(zenith_file)
 my_zenith_pt <- zenith_df %>% filter(my_cellid)
-
-# zenith_df %>%
-#   ggplot(aes(x = to_sensor_zenith_angle)) +
-#   geom_histogram(binwidth = 0.1, col = "black", fill = "gray") +
-#   geom_vline(aes(xintercept = my_zenith_pt$to_sensor_zenith_angle), col = "red") +
-#   theme_bw()
-
+my_zenith_pt$to_sensor_zenith_angle
 mu0 <- cos(my_zenith_pt$to_sensor_zenith_angle)
 mu0
 ```
 
+## Surface factor 
+
+Austin 1980 proposed the factor 0.544 for relating radiance just above the 
+surface with radiance just below the surface. 
+
+Austin, R.W., 1980. Gulf of Mexico, ocean-colour surface-truth measurements. Boundary-Layer
+Meteorol. 18, 269-285.
+
+> TODO: investigate using PAR above and below surface for refining this factor
+
 ## Flight metadata
 
-Dates of flights
+Use dates and timing of flight data to get the closest in situ data
+
+Dates of flights from table
 
 ```{r}
 my_aop_dates <- "../neon-sites/results/sites_join_aop_dates.csv" %>%
@@ -149,11 +195,23 @@ Time of pixel acquisition from L1 radiance data
 radtimes_dir <- "/Volumes/hondula/DATA/radiance-time/"
 radtimes_file <- fs::dir_ls(radtimes_dir, regexp = glue("{my_aq_site}-{my_aop_yr}"))
 radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
-my_radtime <- radtimes_df$datetime
+
+my_radtimes <- radtimes_df$datetime
+my_radtimes
+my_radtime <- my_radtimes[1]
 my_radtime
 ```
 
+> TODO: Use weather data to determine which time in L1 radiance is in L3 product
+
+Either better weather quality product, or non-crossing flight line?
+
+For now just use first one if there are multiple times. 
+
 ## In situ data 
+
+Use time from L1 radiance data to get samples with minimum time difference
+from in situ water chemistry and phytoplankton data
 
 ```{r}
 source("R/get-closest-sample.R")
@@ -164,24 +222,31 @@ names(my_samps) <- my_analytes
 map(my_samps, ~pull(.x, time_diff_days))
 ```
 
-
+> TODO: Also get phytoplankton taxonomy for relative abundance in each group
+> TODO: Figure out what to do if there are bad condition samples
 
 ## Phytoplankton Absorbance
 
-chl conc (mg/L) * specific absorption
+chl conc (ug/L) * specific absorption (m2/mg)
+
+Unit conversion: m2/mg * ug/L = 1/m
 
 chla = sum of chl a AND pheophytin mg/L
 
 specific absorption coefficients from Gege WASI program
 
-Packaging effect: see Equation 2.39 (Bricaud et al 1995) 
+> TODO: Use taxonomy info for separate peaks?
+> TODO: Separate peaks for chla vs pheophytin?
+> TODO: Investigate Packaging effect: see Equation 2.39 (Bricaud et al 1995) 
+> TODO: Estimate at time of flight using chl a sensor data?
 
-m2/mg * ug/L = 1/m
+This data is the farthest in time from flights (> 1 month)
 
 ```{r}
 chla_df <- my_samps$chla
 chla_mgL <- chla_df$analyteConcentration %>% sum()
 chla_ugL = chla_mgL/1000
+chla_mgL
 
 astarPHY <- read_csv("data/gege-wasi-spectra.csv")
 
@@ -202,10 +267,10 @@ astarPHY %>%
 
 ```
 
-Use just phyto_mixA for now
+Use just phyto_mixA for now. 
 
 ```{r}
-my_wavelengths_water
+# my_wavelengths_water
 astarPHY_df <- astarPHY %>% 
   dplyr::filter(nm >= min(my_wavelengths_water),
                 nm <= max(my_wavelengths_water)) %>%
@@ -215,10 +280,18 @@ astarPHY_df <- astarPHY %>%
 # astarPHY_df %>%
 #   ggplot(aes(x = nm, y = abs_phy)) + geom_line()
 
-abs_phy <- astarPHY_df %>%
-  dplyr::select(abs_phy) %>% 
-  purrr::transpose(.names = glue('wl{astarPHY_df$nm}')) %>%
-  purrr::map(~as.numeric(unlist(.x)))
+# abs_phy <- astarPHY_df %>%
+#   dplyr::select(abs_phy) %>% 
+#   purrr::transpose(.names = glue('wl{astarPHY_df$nm}')) %>%
+#   purrr::map(~as.numeric(unlist(.x)))
+```
+
+## Phytoplankton backscattering
+
+> TODO: model for this?
+
+```{r}
+chla_df <- my_samps$chla
 ```
 
 
@@ -239,8 +312,9 @@ abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
 SUVA 254 = abs[254]/DOC
 absREF is absorbance at reference wavelength
 
-*Slope factor shouldn't be calculated between 254 and 280 but for logistics
-assume that absorbance spectra will be determined based on doc and suvas*
+> TODO: Estimate at time of flight using relationship with fDOM?
+> TODO: Improve model with fDOM and/or SUNA data
+> TODO: See if slope factor should be fit from model
 
 ```{r}
 cdom_df <- my_samps$doc
@@ -305,29 +379,24 @@ my_spectra %>%
   theme_bw() +
   ggtitle(glue("CDOM absorbance {my_aq_site} {my_aop_yr}"))
 
-abs_cdom <- dplyr::select(my_spectra, value) %>% 
-  purrr::transpose(.names = glue('wl{my_spectra$wavelength}')) %>%
-  purrr::map(~as.numeric(unlist(.x)))
-abs_cdom$wl382
+# abs_cdom <- dplyr::select(my_spectra, value) %>% 
+#   purrr::transpose(.names = glue('wl{my_spectra$wavelength}')) %>%
+#   purrr::map(~as.numeric(unlist(.x)))
+# abs_cdom$wl382
 ```
 
 ## Non-algal suspended matter absorbance
 
+> TODO: model?? 
+> TODO: estimate at time of flight using sensor turbidity data? 
+
 suspended matter conc (mg/L) * specific absorption
 
-mg/L * m2/g = 1/m
 
 ```{r}
-bstarSM = 0.0086 # m2 per g
 tss_mgL = my_samps$tss$analyteConcentration
 tss_mgL
 
-```
-
-## Phytoplankton backscattering
-
-```{r}
-chla_df <- my_samps$chla
 ```
 
 ## Non-algal suspended matter backscattering
@@ -336,6 +405,10 @@ suspended matter conc (mg/L) * specific backscattering
 
 Constant value of specific backscattering coeffic of suspended matter
 as per Albert and Mobley 2003, from Lake Constance data
+
+mg/L * m2/g = 1/m
+
+> TODO: better model??
 
 ```{r}
 bstarSM = 0.0086 # m2 per g
@@ -357,7 +430,7 @@ surface_factor = 0.544
 
 
 ```{r}
-names(abs_water_list)
+# names(abs_water_list)
 # absorb[] = abs_water_list[] + abs_phyto[] + abs_cdom[] + abs_sm[]
 # backs[] = backs_water_list[] + backs_phyto[] + backs_sm[]
 # rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
@@ -367,20 +440,15 @@ No TSS so ignore for now
 
 Thought I was being fancy with the lists but cant figure out list_merge
 
+> TODO: remove list structure for water spectra
+
 ```{r}
-
-names(abs_water_list) %>% length()
-names(abs_phy) %>% length()
-names(abs_cdom) %>% length()
-
-abs_water_list$wl382
-abs_phy$wl382
-abs_cdom$wl382
 
 Awater_df <- flatten_df(abs_water_list) %>% 
   tidyr::pivot_longer(cols = 1:251, 
                       names_to = "wl", values_to = "abs_water")
-Aphy_df <- astarPHY_df %>% dplyr::select(nm, abs_phy) %>% 
+Aphy_df <- astarPHY_df %>% 
+  dplyr::select(nm, abs_phy) %>% 
   mutate(wl = glue("wl{nm}")) %>% dplyr::select(wl, abs_phy)
 Acdom_df <- my_spectra %>% 
   mutate(wl = glue("wl{wavelength}")) %>%
@@ -405,7 +473,6 @@ model_df <- abs_df %>%
 # backs[] = backs_water_list[] + backs_phyto[]
 # rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
 ```
-
 
 and plot!
 
