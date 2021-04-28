@@ -18,7 +18,7 @@ library(readxl)
 This is a test. 
 
 ```{r}
-my_aq_site <- "SUGG"
+my_aq_site <- "PRPO"
 my_aop_yr <- "2019"
 my_loc_type <- 'buoy.c0'
 ```
@@ -49,10 +49,15 @@ range(my_wavelengths_rs)
 ```
 
 > TODO: striping at the lowest measured wavelengths?
+
 > TODO: errors for PRLA (2017, 2019, 2020) and PRPO (2017) spectra
+
 > TODO: BLUE 2017 (spectra S2 point in the tree canopy)
+
 > TODO: TOOK 2019 reflectance not published
+
 > TODO: FLNT 2019 reflectance not published
+
 > TODO: curate reflectance at stream sites. look at pics. case 1? 
 
 ## Water Properties
@@ -223,6 +228,7 @@ map(my_samps, ~pull(.x, time_diff_days))
 ```
 
 > TODO: Also get phytoplankton taxonomy for relative abundance in each group
+
 > TODO: Figure out what to do if there are bad condition samples
 
 ## Phytoplankton Absorbance
@@ -236,8 +242,11 @@ chla = sum of chl a AND pheophytin mg/L
 specific absorption coefficients from Gege WASI program
 
 > TODO: Use taxonomy info for separate peaks?
+
 > TODO: Separate peaks for chla vs pheophytin?
+
 > TODO: Investigate Packaging effect: see Equation 2.39 (Bricaud et al 1995) 
+
 > TODO: Estimate at time of flight using chl a sensor data?
 
 This data is the farthest in time from flights (> 1 month)
@@ -313,7 +322,9 @@ SUVA 254 = abs[254]/DOC
 absREF is absorbance at reference wavelength
 
 > TODO: Estimate at time of flight using relationship with fDOM?
+
 > TODO: Improve model with fDOM and/or SUNA data
+
 > TODO: See if slope factor should be fit from model
 
 ```{r}
