@@ -18,8 +18,8 @@ library(readxl)
 This is a test. 
 
 ```{r}
-my_aq_site <- "PRPO"
-my_aop_yr <- "2019"
+my_aq_site <- "BLWA"
+my_aop_yr <- "2017"
 my_loc_type <- 'buoy.c0'
 ```
 
@@ -58,7 +58,11 @@ range(my_wavelengths_rs)
 
 > TODO: FLNT 2019 reflectance not published
 
-> TODO: curate reflectance at stream sites. look at pics. case 1? 
+> TODO: curate reflectance at stream sites. look at pics. optically shallow?
+
+For optically shallow waters, would also need bottom depth and bottom albedo,
+and diffuse attentuation coefficient ($K$).
+See eg. Albert and Mobey 2003 equations
 
 ## Water Properties
 
@@ -237,7 +241,7 @@ chl conc (ug/L) * specific absorption (m2/mg)
 
 Unit conversion: m2/mg * ug/L = 1/m
 
-chla = sum of chl a AND pheophytin mg/L
+chla = sum of chl a AND pheophytin (Albert and Mobley 2003)
 
 specific absorption coefficients from Gege WASI program
 
@@ -299,6 +303,9 @@ astarPHY_df <- astarPHY %>%
 
 > TODO: model for this?
 
+Sometimes included in the scattering and backscattering coefficients for 
+suspended matter
+
 ```{r}
 chla_df <- my_samps$chla
 ```
@@ -306,9 +313,16 @@ chla_df <- my_samps$chla
 
 ## CDOM absorbance
 
+Colored dissolved organic matter, also known as gelbstoff, yellow substance,
+or gilvin. Assumed not to scatter light because pigments are totally dissolved.
+
 eqn 4.1 - absorption coefficient of CDOM
 
 abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
+
+$a^*_{CDOM}(\lambda) = exp\left\{ -S \times (\lambda - \lambda_{0})\right\}$
+
+$Y = a_{CDOM}(\lambda_{0})[m^{-1}]$
 
 * abs: absorption coefficient (m^-1)
 * wl: wavelength (lambda)
@@ -317,6 +331,11 @@ abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
    or 412, 443 (central wavelength of satellite bands)
 * SF: slope factor
    **indicator of MW, source, etc**
+
+SF = 0.014 nm-1 at reference wl 440 nm in Bricaud et al 1981
+Gege ch 2 in textbook = values range from 0.004 to 0.053 nm^-1,
+but in most cases in the range between 0.010/nm for humic acid 
+dominated waters and 0.020/nm when fulvic acids prevail
    
 SUVA 254 = abs[254]/DOC
 absREF is absorbance at reference wavelength
@@ -396,13 +415,27 @@ my_spectra %>%
 # abs_cdom$wl382
 ```
 
-## Non-algal suspended matter absorbance
+## Flourescence
+
+> TODO: model??
+
+## Suspended matter absorbance
+
+Seston = all particles aka total suspended material
+
+seston = detritus + phytoplankton
+
+inorganic component of detritus is known as tripton
 
 > TODO: model?? 
 > TODO: estimate at time of flight using sensor turbidity data? 
 
 suspended matter conc (mg/L) * specific absorption
 
+Sometimes set to 0, e.g. for investigations at Lake Constance 
+(Heege 2000 thesis, cited in Albert and Mobley 2003)
+
+detrital part of suspended matter
 
 ```{r}
 tss_mgL = my_samps$tss$analyteConcentration
@@ -410,16 +443,38 @@ tss_mgL
 
 ```
 
-## Non-algal suspended matter backscattering
+## Suspended matter backscattering
+
+All suspended matter or separate phytoplankton and detritus?
+
+Scattering in natural waters is dominated by particles with diameter > 2 $\mu$m
 
 suspended matter conc (mg/L) * specific backscattering 
 
 Constant value of specific backscattering coeffic of suspended matter
 as per Albert and Mobley 2003, from Lake Constance data
 
+$b^*_{b,X} = 0.0086\ m^2g^-1$
+
+Ratio of specific scattering to backscattering 0.019 (Heege thesis)
+
 mg/L * m2/g = 1/m
 
+Angstrom law approximates the wavelength dependency of scattering:
+
+$b_{TSM}(\lambda) = b^*_{TSM} \times \left(\frac{\lambda}{\lambda_{S}}\right)^{-n}$
+
+n is around zero in shallow and inland waters
+
+$b^*_{TSM}$ values are around 0.5 to 1.0 m2/g at $\lambda_S$ = 555 nm
+
+ratio of BACKscattering to total scattering is 0.2-3 % and assumed constant 
+over visible range
+$\tilde{b}_b = b_b \times b_{TSM}(\lambda)$
+
 > TODO: better model??
+
+fit bstar angstrom, ref wavelength from model? 
 
 ```{r}
 bstarSM = 0.0086 # m2 per g
@@ -429,6 +484,33 @@ tss_mgL
 backs_sm <- bstarSM*tss_mgL
 ```
 
+```{r}
+calc_backs_wl <- function(wl, bstarTSM = 1, wlREF = 555, angstrom = 0.1){
+  backs_wl <- bstarTSM * (wl/wlREF)^(-1 *angstrom)
+  return(backs_wl)
+}
+calc_backs_wl(500)
+
+calc_tsm_bspectra <- function(spectra_min = 300, 
+                              spectra_max = 800,
+                              bstarTSM = 1, 
+                              wlREF = 555, 
+                              angstrom = 0.1,
+                              backs_ratio = 0.03){
+  wl_range <- spectra_min:spectra_max
+  my_spectra <- wl_range %>% 
+    purrr::map_dbl(~calc_backs_wl(.x, bstarTSM, wlREF, angstrom)) %>%
+    as_tibble() %>%
+    mutate(wavelength = wl_range) %>%
+    mutate(wavelength = as.numeric(wavelength))
+  return(my_spectra)
+}
+
+calc_tsm_bspectra(angstrom = 0.01) %>%
+  ggplot(aes(x = wavelength, y = value)) +
+  geom_line()
+
+```
 
 ## Model 
 
