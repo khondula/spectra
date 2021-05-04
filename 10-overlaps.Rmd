@@ -19,9 +19,10 @@ library(lubridate)
 This is a test. 
 
 ```{r}
-my_aq_site <- "BLWA"
-my_aop_yr <- "2017"
+my_aq_site <- "TOOK"
+my_aop_yr <- "2018"
 my_loc_type <- 'buoy.c0'
+# my_loc_type <- 'S2'
 ```
 
 ## Measured Reflectance Spectra
@@ -76,8 +77,8 @@ my_aop_dates <- "../neon-sites/results/sites_join_aop_dates.csv" %>%
   readr::read_csv(col_types = "ccccccccddD") %>%
   dplyr::filter(siteID %in% my_aq_site, year %in% my_aop_yr) %>%
   dplyr::select(domanID, siteID, aop_site_id, flightdate) %>%
-  distinct()
-my_aop_dates
+  distinct() %>% arrange(flightdate)
+my_aop_dates 
 ```
 
 Time of pixel acquisition from L1 radiance data
@@ -85,12 +86,24 @@ Time of pixel acquisition from L1 radiance data
 ```{r}
 radtimes_dir <- "/Volumes/hondula/DATA/radiance-time/"
 radtimes_file <- fs::dir_ls(radtimes_dir, regexp = glue("{my_aq_site}-{my_aop_yr}"))
-radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
+if(is_empty(radtimes_file)){message("NO radiance data")}
+if(!is_empty(radtimes_file)){message("YES radiance data")}
+```
 
-my_radtimes <- radtimes_df$datetime
-my_radtimes
-my_radtime <- my_radtimes[1]
-my_radtime
+ONLY if there is radiance data
+```{r}
+# radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
+# radtimes_df
+# my_radtimes <- radtimes_df$datetime
+# my_radtimes
+# my_radtime <- my_radtimes[1]
+# my_radtime
+```
+
+OTHERWISE use flight date
+```{r}
+my_aop_dates$flightdate
+my_radtime <- my_aop_dates$flightdate[1]
 ```
 
 > TODO: Use weather data to determine which time in L1 radiance is in L3 product
@@ -104,9 +117,12 @@ For now just use first one if there are multiple times.
 Use time from L1 radiance data to get samples with minimum time difference
 from in situ water chemistry and phytoplankton data
 
+FLNT 2017 chl a data collectDate different
+
 ```{r}
 source("R/get-closest-sample.R")
 my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
+
 my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x, my_time = my_radtime))
 names(my_samps) <- my_analytes
 
@@ -122,10 +138,16 @@ overlap_df <- map_df(my_samps, ~select(.x, namedLocation, collectDate, analyte, 
         aq_site = my_aq_site, aop_yr = my_aop_yr,
         loc_type = my_loc_type,
         flightdate = as_date(my_radtime),
-        notes = glue("updated {Sys.Date()}")) %>%
+        radiance_time = my_radtime,
+        # whether multiple flightlines need sorted
+        multiple_flightlines = NA, 
+        # whether multiple flight dates need sorted
+        multiple_flightdates = nrow(my_aop_dates) > 1) %>%
   dplyr::select(aop_siteyear, aq_site, aop_yr, loc_type, flightdate,
+                radiance_time,
                 collectDate, namedLocation, analyteid, analyte, analyteConcentration,
-                time_diff_days)
+                time_diff_days, multiple_flightlines, multiple_flightdates) %>%
+  mutate(overlap_final = all(!multiple_flightlines))
   
 overlap_path <- glue("results/overlaps/{my_aq_site}{my_aop_yr}.csv")
 write_csv(overlap_df, overlap_path)
@@ -139,7 +161,9 @@ write_csv(overlap_df, overlap_path)
 with chl a, turbidity, CDOM, DOC, at each wavelength (separate doc)
 
 ```{r}
-fs::dir_ls("results/overlaps") %>%
+all_overlaps_df <- fs::dir_ls("results/overlaps") %>%
   map_df(~read_csv(.x))
+all_overlaps_df %>% pull(aop_siteyear) %>% unique()
+all_overlaps_df %>% write_csv("results/overlaps.csv")
 ```
 

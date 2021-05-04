@@ -187,7 +187,7 @@ Meteorol. 18, 269-285.
 
 ## In situ data 
 
-use site-year ID to get in situ data
+use site-year ID to get in situ data. Overlaps are determined in `10-overlaps`
 
 ```{r}
 aos_df <- fs::dir_ls("results/overlaps", regexp = glue("*{my_aq_site}{my_aop_yr}")) %>%
