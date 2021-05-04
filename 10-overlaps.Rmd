@@ -1,0 +1,169 @@
+---
+title: "Bio-Optical Model"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE)
+```
+
+```{r}
+library(glue)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+This is a test. 
+
+```{r}
+my_aq_site <- "TOOK"
+my_aop_yr <- "2018"
+my_loc_type <- 'buoy.c0'
+# my_loc_type <- 'S2'
+```
+
+## Measured Reflectance Spectra
+
+```{r}
+spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
+spectra_file <- fs::dir_ls(spectra_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
+
+spectra_df <- read_csv(spectra_file)
+my_spectra_pt <- spectra_df %>% filter(my_cellid)
+
+rrs <- spectra_df %>%
+  ggplot(aes(wavelength, reflectance)) +
+  geom_line(aes(group = cell)) +
+  geom_line(data = my_spectra_pt, col = "green", lwd = 1) +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 0.1)) +
+  theme(legend.position = "none")
+rrs + ggtitle(glue("Measured reflectance at {my_aq_site} {my_loc_type} {my_aop_yr}"))
+
+```
+
+```{r}
+my_wavelengths_rs <- my_spectra_pt$wavelength
+range(my_wavelengths_rs)
+```
+
+> TODO: striping at the lowest measured wavelengths. real? waves?
+
+> TODO: errors for PRLA (2017, 2019, 2020) and PRPO (2017) spectra
+
+> TODO: BLUE 2017 (spectra S2 point in the tree canopy)
+
+> TODO: TOOK 2019 reflectance not published
+
+> TODO: FLNT 2019 reflectance not published
+
+> TODO: curate reflectance at stream sites. look at pics. optically shallow?
+
+For optically shallow waters, would also need bottom depth and bottom albedo,
+and diffuse attentuation coefficient ($K$).
+See eg. Albert and Mobey 2003 equations
+
+## Flight metadata
+
+Use dates and timing of flight data to get the closest in situ data
+
+Dates of flights from table
+
+```{r}
+my_aop_dates <- "../neon-sites/results/sites_join_aop_dates.csv" %>%
+  readr::read_csv(col_types = "ccccccccddD") %>%
+  dplyr::filter(siteID %in% my_aq_site, year %in% my_aop_yr) %>%
+  dplyr::select(domanID, siteID, aop_site_id, flightdate) %>%
+  distinct() %>% arrange(flightdate)
+my_aop_dates 
+```
+
+Time of pixel acquisition from L1 radiance data
+
+```{r}
+radtimes_dir <- "/Volumes/hondula/DATA/radiance-time/"
+radtimes_file <- fs::dir_ls(radtimes_dir, regexp = glue("{my_aq_site}-{my_aop_yr}"))
+if(is_empty(radtimes_file)){message("NO radiance data")}
+if(!is_empty(radtimes_file)){message("YES radiance data")}
+```
+
+ONLY if there is radiance data
+```{r}
+# radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
+# radtimes_df
+# my_radtimes <- radtimes_df$datetime
+# my_radtimes
+# my_radtime <- my_radtimes[1]
+# my_radtime
+```
+
+OTHERWISE use flight date
+```{r}
+my_aop_dates$flightdate
+my_radtime <- my_aop_dates$flightdate[1]
+```
+
+> TODO: Use weather data to determine which time in L1 radiance is in L3 product
+
+Either better weather quality product, or non-crossing flight line?
+
+For now just use first one if there are multiple times. 
+
+## In situ data 
+
+Use time from L1 radiance data to get samples with minimum time difference
+from in situ water chemistry and phytoplankton data
+
+FLNT 2017 chl a data collectDate different
+
+```{r}
+source("R/get-closest-sample.R")
+my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
+
+my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x, my_time = my_radtime))
+names(my_samps) <- my_analytes
+
+map(my_samps, ~pull(.x, time_diff_days))
+```
+
+save the overlaps to the overlap table
+
+```{r}
+overlap_df <- map_df(my_samps, ~select(.x, namedLocation, collectDate, analyte, analyteConcentration, time_diff_days), .id = "analyteid") %>%
+  distinct() %>%
+  mutate(aop_siteyear = glue("{my_aq_site}{my_aop_yr}"),
+        aq_site = my_aq_site, aop_yr = my_aop_yr,
+        loc_type = my_loc_type,
+        flightdate = as_date(my_radtime),
+        radiance_time = my_radtime,
+        # whether multiple flightlines need sorted
+        multiple_flightlines = NA, 
+        # whether multiple flight dates need sorted
+        multiple_flightdates = nrow(my_aop_dates) > 1) %>%
+  dplyr::select(aop_siteyear, aq_site, aop_yr, loc_type, flightdate,
+                radiance_time,
+                collectDate, namedLocation, analyteid, analyte, analyteConcentration,
+                time_diff_days, multiple_flightlines, multiple_flightdates) %>%
+  mutate(overlap_final = all(!multiple_flightlines))
+  
+overlap_path <- glue("results/overlaps/{my_aq_site}{my_aop_yr}.csv")
+write_csv(overlap_df, overlap_path)
+```
+
+> TODO: Also get phytoplankton taxonomy for relative abundance in each group
+
+> TODO: Figure out what to do if there are bad condition samples
+
+> TODO: Save closest samples for each year then look for correlations
+with chl a, turbidity, CDOM, DOC, at each wavelength (separate doc)
+
+```{r}
+all_overlaps_df <- fs::dir_ls("results/overlaps") %>%
+  map_df(~read_csv(.x))
+all_overlaps_df %>% pull(aop_siteyear) %>% unique()
+all_overlaps_df %>% write_csv("results/overlaps.csv")
+```
+
