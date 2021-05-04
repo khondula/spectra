@@ -9,6 +9,7 @@ library(tidyverse)
 library(glue)
 library(lubridate)
 library(rhdf5)
+library(hms)
 # library(terra)
 # library(stars)
 # library(scico)
@@ -19,12 +20,31 @@ source('R/hs_mapinfo.R')
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'LIRO'
-my_aop_yr <- '2020'
+my_aq_site <- 'BARC'
+my_aop_yr <- '2017'
 my_loc_type <- 'buoy.c0'
 
-save_radiance_times(my_aq_site = 'PRLA', '2020', 'buoy.c0')
-save_radiance_times(my_aq_site = 'PRPO', '2020', 'buoy.c0')
+save_radiance_times(my_aq_site = 'BARC', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'SUGG', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'BARC', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'SUGG', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'CRAM', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'CRAM', '2019', 'buoy.c0')
+save_radiance_times(my_aq_site = 'LIRO', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'PRPO', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'PRLA', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'TOOK', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'TOOK', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'FLNT', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'FLNT', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'BLWA', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'BLWA', '2019', 'buoy.c0')
+save_radiance_times(my_aq_site = 'TOMB', '2017', 'buoy.c0')
+save_radiance_times(my_aq_site = 'TOMB', '2018', 'buoy.c0')
+save_radiance_times(my_aq_site = 'TOMB', '2019', 'buoy.c0')
+save_radiance_times(my_aq_site = 'BLUE', '2017', 'S2')
+
+
 
 save_radiance_times <- function(my_aq_site, my_aop_yr, my_loc_type){
 # to get AOP name for AQ site
@@ -135,13 +155,14 @@ extract_gpstime <- function(my_h5_file, my_aq_prj_sp){
   my_hs_terra <- my_r %>% terra::rast()
   
   my_gpstime <- terra::extract(my_hs_terra, my_pt_spatvec, cells = TRUE)
-  gsp_df <- my_gpstime %>%
+  gsp_df1 <- my_gpstime %>%
     rename(gps_time = layer) %>% 
     mutate(x = terra::xFromCell(my_hs_terra, cell),
            y = terra::yFromCell(my_hs_terra, cell)) %>%
     mutate(filename = basename(my_h5_file)) %>%
     mutate(date = str_sub(filename, 19, 26)) %>%
-    mutate(datestring = glue('{date} {hms(hours = gps_time)}')) %>%
+    mutate(datestring = glue('{date} {hms(hours = gps_time)}'))
+  gsp_df <- gsp_df1 %>%
     mutate(datetime = lubridate::as_datetime(datestring))
   
 
