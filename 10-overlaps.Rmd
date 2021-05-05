@@ -19,10 +19,10 @@ library(lubridate)
 This is a test. 
 
 ```{r}
-my_aq_site <- "TOOK"
-my_aop_yr <- "2018"
+my_aq_site <- "BLUE"
+my_aop_yr <- "2017"
 my_loc_type <- 'buoy.c0'
-# my_loc_type <- 'S2'
+my_loc_type <- 'S2'
 ```
 
 ## Measured Reflectance Spectra
@@ -85,6 +85,7 @@ Time of pixel acquisition from L1 radiance data
 
 ```{r}
 radtimes_dir <- "/Volumes/hondula/DATA/radiance-time/"
+# rad_df <- fs::dir_ls(radtimes_dir) %>% map_dfr(~read_csv(.x, col_types = 'dddddcdcc'))
 radtimes_file <- fs::dir_ls(radtimes_dir, regexp = glue("{my_aq_site}-{my_aop_yr}"))
 if(is_empty(radtimes_file)){message("NO radiance data")}
 if(!is_empty(radtimes_file)){message("YES radiance data")}
@@ -92,18 +93,18 @@ if(!is_empty(radtimes_file)){message("YES radiance data")}
 
 ONLY if there is radiance data
 ```{r}
-# radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
-# radtimes_df
-# my_radtimes <- radtimes_df$datetime
-# my_radtimes
-# my_radtime <- my_radtimes[1]
-# my_radtime
+radtimes_df <- read_csv(radtimes_file) %>% dplyr::filter(!is.na(gps_time))
+radtimes_df
+my_radtimes <- radtimes_df$datetime
+my_radtimes
+my_radtime <- my_radtimes[1]
+my_radtime
 ```
 
 OTHERWISE use flight date
 ```{r}
-my_aop_dates$flightdate
-my_radtime <- my_aop_dates$flightdate[1]
+# my_aop_dates$flightdate
+# my_radtime <- my_aop_dates$flightdate[1]
 ```
 
 > TODO: Use weather data to determine which time in L1 radiance is in L3 product
@@ -129,6 +130,8 @@ names(my_samps) <- my_analytes
 map(my_samps, ~pull(.x, time_diff_days))
 ```
 
+> TODO: No BLUE in situ data? Could be wrong sampling point
+
 save the overlaps to the overlap table
 
 ```{r}
@@ -140,7 +143,7 @@ overlap_df <- map_df(my_samps, ~select(.x, namedLocation, collectDate, analyte, 
         flightdate = as_date(my_radtime),
         radiance_time = my_radtime,
         # whether multiple flightlines need sorted
-        multiple_flightlines = NA, 
+        multiple_flightlines = FALSE, 
         # whether multiple flight dates need sorted
         multiple_flightdates = nrow(my_aop_dates) > 1) %>%
   dplyr::select(aop_siteyear, aq_site, aop_yr, loc_type, flightdate,
