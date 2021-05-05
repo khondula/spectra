@@ -20,29 +20,13 @@ source('R/hs_mapinfo.R')
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'BARC'
-my_aop_yr <- '2017'
-my_loc_type <- 'buoy.c0'
+my_aq_site <- 'ARIK'
+my_aop_yr <- '2020'
+my_loc_type <- 'S2'
 
-save_radiance_times(my_aq_site = 'BARC', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'SUGG', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'BARC', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'SUGG', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'CRAM', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'CRAM', '2019', 'buoy.c0')
-save_radiance_times(my_aq_site = 'LIRO', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'PRPO', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'PRLA', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'TOOK', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'TOOK', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'FLNT', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'FLNT', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'BLWA', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'BLWA', '2019', 'buoy.c0')
-save_radiance_times(my_aq_site = 'TOMB', '2017', 'buoy.c0')
-save_radiance_times(my_aq_site = 'TOMB', '2018', 'buoy.c0')
-save_radiance_times(my_aq_site = 'TOMB', '2019', 'buoy.c0')
-save_radiance_times(my_aq_site = 'BLUE', '2017', 'S2')
+
+
+save_radiance_times(my_aq_site = 'ARIK', '2020', 'S2')
 
 
 
@@ -137,7 +121,7 @@ extract_gpstime <- function(my_h5_file, my_aq_prj_sp){
   # make sure to transpose!! 
   my_r <- raster(t(obs1_matrix))
   # replace No data pixels
-  ids <- values(my_r[[1]]) == my_info$Data_Ignore_Value
+  ids <- raster::values(my_r[[1]]) == my_info$Data_Ignore_Value
   my_r[ids] <- NA
   
   # set extent and CRS
@@ -175,3 +159,8 @@ times_df <- my_h5_files %>% purrr::map_dfr(~extract_gpstime(.x, my_aq_prj_sp))
 rad_times_dir <- 'H:/DATA/radiance-time'
 times_df %>% write_csv(glue('{rad_times_dir}/{my_aq_site}-{my_aop_yr}_radianceTime.csv'))
 }
+
+# my_h5_files
+# my_h5_file <- my_h5_files[1]
+# 
+# extract_gpstime(my_h5_files[1], my_aq_prj_sp)
