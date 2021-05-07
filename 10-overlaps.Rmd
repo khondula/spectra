@@ -19,10 +19,10 @@ library(lubridate)
 This is a test. 
 
 ```{r}
-my_aq_site <- "TECR"
-my_aop_yr <- "2019"
-# my_loc_type <- 'buoy.c0'
-my_loc_type <- 'S2'
+my_aq_site <- "PRPO"
+my_aop_yr <- "2017"
+my_loc_type <- 'buoy.c0'
+# my_loc_type <- 'S2'
 ```
 
 ## Measured Reflectance Spectra
@@ -51,14 +51,6 @@ range(my_wavelengths_rs)
 ```
 
 > TODO: striping at the lowest measured wavelengths. real? waves?
-
-> TODO: errors for PRLA (2017, 2019, 2020) and PRPO (2017) spectra
-
-> TODO: BLUE 2017 (spectra S2 point in the tree canopy)
-
-> TODO: TOOK 2019 reflectance not published
-
-> TODO: FLNT 2019 reflectance not published
 
 > TODO: shiny app to show spectra from a given pixel
 
@@ -120,8 +112,6 @@ For now just use first one if there are multiple times.
 Use time from L1 radiance data to get samples with minimum time difference
 from in situ water chemistry and phytoplankton data
 
-FLNT 2017 chl a data collectDate different
-
 ```{r}
 source("R/get-closest-sample.R")
 my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
@@ -159,9 +149,6 @@ write_csv(overlap_df, overlap_path)
 > TODO: Also get phytoplankton taxonomy for relative abundance in each group
 
 > TODO: Figure out what to do if there are bad condition samples
-
-> TODO: Save closest samples for each year then look for correlations
-with chl a, turbidity, CDOM, DOC, at each wavelength (separate doc)
 
 ```{r}
 all_overlaps_df <- fs::dir_ls("results/overlaps") %>%
