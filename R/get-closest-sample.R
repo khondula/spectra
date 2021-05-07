@@ -2,9 +2,9 @@ library(glue)
 library(tidyverse)
 # my_analyte <- 'chla'
 # my_time <- my_radtime
-get_closest_sample <- function(my_analyte, my_time){
+get_closest_sample <- function(my_analyte, my_time, my_loc_type = 'buoy.c0'){
   
-  my_loc_type <- 'buoy.c0'
+  # my_loc_type <- 'buoy.c0'
   grab_paths <- list(SUVA254 = 'suva254_all.csv',
                      SUVA280 = 'suva280_all.csv',
                      doc = 'doc_all.csv',
