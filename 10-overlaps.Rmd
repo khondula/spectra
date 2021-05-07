@@ -19,9 +19,9 @@ library(lubridate)
 This is a test. 
 
 ```{r}
-my_aq_site <- "BLUE"
-my_aop_yr <- "2017"
-my_loc_type <- 'buoy.c0'
+my_aq_site <- "TECR"
+my_aop_yr <- "2019"
+# my_loc_type <- 'buoy.c0'
 my_loc_type <- 'S2'
 ```
 
@@ -59,6 +59,8 @@ range(my_wavelengths_rs)
 > TODO: TOOK 2019 reflectance not published
 
 > TODO: FLNT 2019 reflectance not published
+
+> TODO: shiny app to show spectra from a given pixel
 
 > TODO: curate reflectance at stream sites. look at pics. optically shallow?
 
@@ -124,18 +126,16 @@ FLNT 2017 chl a data collectDate different
 source("R/get-closest-sample.R")
 my_analytes <- c("SUVA254", "SUVA280", "doc", "tss", "chla")
 
-my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x, my_time = my_radtime))
+my_samps <- my_analytes %>% purrr::map(~get_closest_sample(.x, my_time = my_radtime, my_loc_type = my_loc_type))
 names(my_samps) <- my_analytes
 
 map(my_samps, ~pull(.x, time_diff_days))
 ```
 
-> TODO: No BLUE in situ data? Could be wrong sampling point
-
 save the overlaps to the overlap table
 
 ```{r}
-overlap_df <- map_df(my_samps, ~select(.x, namedLocation, collectDate, analyte, analyteConcentration, time_diff_days), .id = "analyteid") %>%
+overlap_df <- map_df(my_samps, ~dplyr::select(.x, namedLocation, collectDate, analyte, analyteConcentration, time_diff_days), .id = "analyteid") %>%
   distinct() %>%
   mutate(aop_siteyear = glue("{my_aq_site}{my_aop_yr}"),
         aq_site = my_aq_site, aop_yr = my_aop_yr,
@@ -143,7 +143,7 @@ overlap_df <- map_df(my_samps, ~select(.x, namedLocation, collectDate, analyte, 
         flightdate = as_date(my_radtime),
         radiance_time = my_radtime,
         # whether multiple flightlines need sorted
-        multiple_flightlines = FALSE, 
+        multiple_flightlines = TRUE, 
         # whether multiple flight dates need sorted
         multiple_flightdates = nrow(my_aop_dates) > 1) %>%
   dplyr::select(aop_siteyear, aq_site, aop_yr, loc_type, flightdate,
