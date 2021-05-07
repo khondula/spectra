@@ -18,9 +18,10 @@ spectra_dir <- 'H:/DATA/spectra_buff5m'
 shp_dir <- 'H:/DATA/spatial'
 
 # inputs
-my_aq_site <- 'BARC'
-my_aop_yr <- '2018'
+my_aq_site <- 'PRLA'
+my_aop_yr <- '2017'
 my_loc_type <- 'buoy.c0'
+# my_loc_type <- 'S2'
 nbands <- 100
 
 
@@ -31,16 +32,17 @@ save_spectra_buff5m <- function(my_aq_site, my_aop_yr,
   spectra_dir <- 'H:/DATA/spectra_buff5m'
   shp_dir <- 'H:/DATA/spatial'
   # to get AOP name for AQ site
-my_aop_site <- 'results/sites_join_aop_dates.csv' %>%
-  readr::read_csv(col_types = 'ccccccccddD') %>%
-  dplyr::filter(siteID %in% my_aq_site) %>%
-  dplyr::pull(aop_site_id) %>% unique()
+  my_aop_site <- 'results/sites_join_aop_dates.csv' %>%
+    readr::read_csv(col_types = 'ccccccccddD') %>%
+    dplyr::filter(siteID %in% my_aq_site) %>%
+    dplyr::pull(aop_site_id) %>% unique()
 
 # read in point for AQ site
 my_aq_sf <- glue('{shp_dir}/swchem_sites/swchem_sites.shp') %>%
-  st_read() %>% dplyr::filter(siteID == my_aq_site) %>%
+  st_read() %>% 
+  dplyr::filter(siteID == my_aq_site) %>%
   mutate(location_type = substr(nmdLctn, 10, nchar(nmdLctn))) %>% 
-  dplyr::filter(location_type == my_loc_type)
+  dplyr::filter(location_type == my_loc_type) %>% head(1)
 my_domain <- my_aq_sf$domanID[1]
 
 # folder with AOP data
@@ -99,11 +101,13 @@ if(length(my_h5_files) == 1){
 }
 if(length(my_h5_files) > 1){
   my_h5 <- hs_read(my_h5_files[1], bands = 1:nbands)
-  names(my_h5) <- hs_wavelength(my_h5_files, bands = 1:nbands)
+  names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
   my_hs_list <- purrr::map(my_h5_files, ~hs_read(.x, bands = 1:nbands))
   for(i in 2:length(my_h5_files)){
     my_h5 <- merge(my_h5, my_hs_list[[i]])
   }
+  names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
+  
 }
 
 # extract spectra from pixels within the 5m buffered point
@@ -146,15 +150,16 @@ my_spectra_df %>%
 
 
 bands_to_plot <- seq(1, 100, length.out = 12)
-my_h5 <- hs_read(my_h5_files, bands = bands_to_plot)
-names(my_h5) <- hs_wavelength(my_h5_files, bands = bands_to_plot)
+# my_h5 <- hs_read(my_h5_files, bands = bands_to_plot)
+# names(my_h5) <- hs_wavelength(my_h5_files, bands = bands_to_plot)
 
 my_aq_prj_buff <- st_buffer(my_aq_prj, 5)
 my_buff_sp <- as(my_aq_prj_buff, "Spatial")
 my_aq_prj_buff30 <- st_buffer(my_aq_prj, 25)
 my_buff30_sp <- as(my_aq_prj_buff30, "Spatial")
 
-my_hs_crop <- raster::crop(my_h5, my_buff30_sp)
+my_h5_bands <- raster::subset(my_h5, subset = bands_to_plot)
+my_hs_crop <- raster::crop(my_h5_bands, my_buff30_sp)
 hs_crop_stars <- my_hs_crop %>% st_as_stars()
 
 gg <- ggplot() +
@@ -171,42 +176,15 @@ gg <- ggplot() +
 ggsave(glue('figs/buff5m-maps/{my_aq_site}_{my_aop_yr}_{str_replace_all(my_loc_type, "[:punct:]", "")}.pdf'), plot = gg, width = 10, height = 8)
 }
 
-save_spectra_buff5m('BARC', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('BARC', '2019', 'buoy.c0', 100)
 #
-save_spectra_buff5m('SUGG', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('SUGG', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('SUGG', '2019', 'buoy.c0', 100)
-#
-save_spectra_buff5m('CRAM', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('CRAM', '2019', 'buoy.c0', 100)
 #
 save_spectra_buff5m('PRLA', '2017', 'buoy.c0', 100)
 save_spectra_buff5m('PRLA', '2019', 'buoy.c0', 100)
 save_spectra_buff5m('PRLA', '2020', 'buoy.c0', 100)
-
 save_spectra_buff5m('PRPO', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('PRPO', '2019', 'buoy.c0', 100)
 
-save_spectra_buff5m('LIRO', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('LIRO', '2020', 'buoy.c0', 100)
 
-save_spectra_buff5m('TOOK', '2017', 'buoy.c0', 100, 0.1)
-save_spectra_buff5m('TOOK', '2018', 'buoy.c0', 100, 0.1)
-#save_spectra_buff5m('TOOK', '2019', 'buoy.c0', 100)
-
-save_spectra_buff5m('FLNT', '2017', 'buoy.c0', 100)
-
-save_spectra_buff5m('BLWA', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('BLWA', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('BLWA', '2019', 'buoy.c0', 100, 0.1)
-
-save_spectra_buff5m('TOMB', '2017', 'buoy.c0', 100)
-save_spectra_buff5m('TOMB', '2018', 'buoy.c0', 100)
-save_spectra_buff5m('TOMB', '2019', 'buoy.c0', 100, 0.1)
-
-save_spectra_buff5m('BLUE', '2017', 'buoy.c0', 100)
-
+# STREAMS
 
 save_spectra_buff5m('SYCA', '2019', 'S2', 100)
 
