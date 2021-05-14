@@ -57,18 +57,19 @@ in7 <- sliderInput("sbSED",
                    value = 1)
 in8 <- sliderInput("bbCHL",
                    "chl bb:",
-                   min =1.73e-2,
-                   max = 1.73e-2,
+                   min = 1e-8,
+                   max = 3.94e-1,
                    value = 1.73e-2)
 in9 <- sliderInput("bbSED",
                    "sed bb:",
-                   min =  4.64e-2,
-                   max =  4.64e-2,
+                   min =  1e-8,
+                   max =  6.59e-1,
                    value =  4.64e-2)
 in10 <- sliderInput("mu0",
                    "zenith angle:",
                    min =  0,
-                   max =  2,
+                   max =  1.4,
+                   step = 0.1,
                    value =  1)
 in11 <- sliderInput("scatterCHL443",
                    "chl scatter at 443:",
@@ -82,6 +83,8 @@ in12 <- sliderInput("scatterSED443",
                    value =  1.85)
 # outputs
 out1 <- ggiraphOutput("distPlot")
+out2 <- ggiraphOutput("backsPlot")
+out3 <- textOutput("bratio1")
 # out2 <- tableOutput("mydf")
 
 
@@ -96,7 +99,7 @@ ui <- fluidPage(
                 tabPanel("backs", in7, in8, in9, in11, in12, in10))),
         # Show a plot of the generated distribution
         mainPanel(
-           out1
+            out1, out2
         )
     )
 )
@@ -121,21 +124,30 @@ server <- function(input, output) {
         abs_df
     })
     
-    backs_df <- reactive({
-        
-        BSchl_spectra <- calc_scatter_spectra(input$scatterCHL443, input$sbCHL, 
-                                              input$bbCHL/input$scatterCHL443) %>%
+    BSchl_spectra <- reactive({
+        calc_scatter_spectra(scatterREF = input$scatterCHL443, 
+                             bSF = input$sbCHL, 
+                             bratio = input$bbCHL/input$scatterCHL443) %>%
             rename(wl = wavelength, bb_chl = backscatter_m1) %>%
             dplyr::select(wl, bb_chl)
         
-        BSsed_spectra <- calc_scatter_spectra(input$scatterSED443, input$sbSED, 
-                                              input$bbSED/input$scatterSED443) %>%
-            rename(wl = wavelength, bb_sed = backscatter_m1) %>%
-            dplyr::select(wl, bb_sed)
-        
+    })    
+    bratio_sed <- reactive({
+        input$bbSED/input$scatterSED443
+    })
+    output$bratio1 <- renderText({bratio_sed()})
+    BSsed_spectra <- reactive({
+        calc_scatter_spectra(scatterREF = input$scatterSED443, 
+                             bSF = input$sbSED, 
+                             bratio = bratio_sed()) %>%
+        rename(wl = wavelength, bb_sed = backscatter_m1) %>%
+        dplyr::select(wl, bb_sed)
+        })
+    
+    backs_df <- reactive({
         backs_df <- backs_water %>%
-            left_join(BSchl_spectra) %>%
-            left_join(BSsed_spectra) %>%
+            left_join(BSchl_spectra()) %>%
+            left_join(BSsed_spectra()) %>%
             mutate(backs_total = backs_water + bb_chl + bb_sed)
         backs_df
     })
@@ -164,6 +176,22 @@ server <- function(input, output) {
             geom_point_interactive(aes(tooltip = wl, data_id = wl), size = 1)
         x <- girafe(code = print(gg1))
         x    })
+    output$backsPlot <- renderGirafe({
+        
+        rs2 <-  rs_df() %>% 
+            # dplyr::filter(wl %in% water_wls) %>%
+            ggplot(aes(x = wl, y = backs_total)) +
+            geom_line(lwd = 1) +
+            geom_line(aes(y = bb_chl), col = "green") +
+            geom_line(aes(y = bb_sed), col = "orange") +
+            geom_line(aes(y = backs_water), col = "blue") +
+            theme_bw() +
+            ggtitle("Backscattering")
+        
+        gg2 <- rs2 +
+            geom_point_interactive(aes(tooltip = wl, data_id = wl), size = 1)
+        x2 <- girafe(code = print(gg2))
+        x2    })
 }
 
 # Run the application 

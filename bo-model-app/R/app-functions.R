@@ -7,12 +7,12 @@ calc_absorb <- function(wl, absREF, aSF =  1.3e-2, wlREF = 443){
   return(abs_wl)
 }
 
-calc_scatter <- function(wl, scatterREF, bSF = 1, wlREF = 443){
+calc_scatter <- function(wl, scatterREF, bSF, wlREF = 443){
   scatter_wl <- scatterREF * (wl/wlREF)^(bSF)
   return(scatter_wl)
 }
 
-calc_scatter_spectra <- function(scatterREF, bSF =  1,
+calc_scatter_spectra <- function(scatterREF, bSF,
                                  bratio = 0.01, wlREF = 443, 
                                  spectra_min = 400, spectra_max = 800){
   wl_range <- spectra_min:spectra_max
