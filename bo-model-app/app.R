@@ -84,7 +84,7 @@ in12 <- sliderInput("scatterSED443",
 # outputs
 out1 <- ggiraphOutput("distPlot")
 out2 <- ggiraphOutput("backsPlot")
-out3 <- textOutput("bratio1")
+out3 <- ggiraphOutput("absPlot")
 # out2 <- tableOutput("mydf")
 
 
@@ -95,11 +95,14 @@ ui <- fluidPage(
     sidebarLayout(
         sidebarPanel(
             tabsetPanel(
-                tabPanel("abs", in1, in2, in3, in4, in5, in6),
-                tabPanel("backs", in7, in8, in9, in11, in12, in10))),
+                tabPanel("set1", in1, in2, in3, in4, in5, in6),
+                tabPanel("set2", in7, in8, in9, in11, in12, in10))),
         # Show a plot of the generated distribution
         mainPanel(
-            out1, out2
+            tabsetPanel(
+                tabPanel("Reflectance", out1),
+                tabPanel("Absorbance", out3),
+                tabPanel("Backscattering", out2))
         )
     )
 )
@@ -176,6 +179,21 @@ server <- function(input, output) {
             geom_point_interactive(aes(tooltip = wl, data_id = wl), size = 1)
         x <- girafe(code = print(gg1))
         x    })
+    
+    output$absPlot <- renderGirafe({
+        rs3 <- rs_df() %>% 
+            ggplot(aes(x = wl, y = abs_total)) +
+            geom_line(lwd = 1) +
+            geom_line(aes(y = abs_nap), col = "brown") +
+            geom_line(aes(y = abs_cdom), col = "orange") +
+            geom_line(aes(y = abs_water), col = "blue") +
+            theme_bw() +
+            ggtitle("Absorbance")
+        gg3 <- rs3 +
+            geom_point_interactive(aes(tooltip = abs_total, data_id = abs_total), size = 1)
+        x3 <- girafe(code = print(gg3))
+        x3   
+    })
     output$backsPlot <- renderGirafe({
         
         rs2 <-  rs_df() %>% 
@@ -189,7 +207,7 @@ server <- function(input, output) {
             ggtitle("Backscattering")
         
         gg2 <- rs2 +
-            geom_point_interactive(aes(tooltip = wl, data_id = wl), size = 1)
+            geom_point_interactive(aes(tooltip = backs_total, data_id = backs_total), size = 1)
         x2 <- girafe(code = print(gg2))
         x2    })
 }
