@@ -267,8 +267,6 @@ astarPHY %>%
 
 ```
 
-Use just phyto_mixA for now. 
-
 ```{r}
 # my_wavelengths_water
 astarPHY_df <- astarPHY %>% 
@@ -285,6 +283,33 @@ astarPHY_df <- astarPHY %>%
 #   purrr::transpose(.names = glue('wl{astarPHY_df$nm}')) %>%
 #   purrr::map(~as.numeric(unlist(.x)))
 ```
+
+Model from Lee et al 1998
+
+$a_{\phi}(\lambda) = \big[ a_0(\lambda) + a_1(\lambda) \times ln(a_{\phi}(440)) \big] a_{\phi}(440)$
+
+```{r}
+leet2 <- read_csv('data/lee1998-t2_phy_abs_coeffs.csv')
+
+abs440 = 1
+
+lee_spectra <- leet2 %>%
+  dplyr::mutate(absorb1 = (a0 + a1*log(abs440))*abs440,
+                absorb2 = (a0 + a1*log(0.5))*0.5,
+                absorb3 = (a0 + a1*log(2))*2)
+
+lee_spectra %>%
+  ggplot(aes(x = wavelength, y = absorb1)) +
+  geom_line() +
+  geom_point() +
+  geom_line(aes(y = absorb2), col = 'blue') +
+  geom_point(aes(y = absorb2), col = 'blue') +
+  geom_line(aes(y = absorb3), col = 'red') +
+  geom_point(aes(y = absorb3), col = 'red') +
+  theme_bw() +
+  ggtitle('absorbance at abs440 = 0.5, 1, 2')
+```
+
 
 ## Phytoplankton backscattering
 
@@ -428,6 +453,8 @@ Sometimes set to 0, e.g. for investigations at Lake Constance
 detrital part of suspended matter can be approximated using
 exponential equation like CDOM (eqn 2.44)
 
+(SPECIFIC absorption)
+
 $a^*_d(\lambda) = exp\left{-S_d \times (\lambda - \lambda_0)\right}$
 
 $S_d$ values are typically less than for CDOM. 
@@ -438,6 +465,19 @@ In highly turbid waters, spectra could be affected by iron oxides
 
 Detritus absorption can have shoulders due to the breakdown 
 products of photosynthetic pigments (Kirk 2011). can maybe use pheophytin here?
+
+Eqn 5.1 (Giardino chapter) similar to above
+but for absorbance
+
+$a_{NAP}(\lambda) = a_{NAP}(\lambda_{ref}) \times e^{-S_{NAP}(\lambda - \lambda_{ref})}$
+
+
+* reference wavelength in blue
+* Shape factor of exponential curve calculated for each
+spectra using linear regression between wavelength and natural
+log of $a_{NAP}(\lambda)$ 
+* fit between 380-730 nm, but excluding 400-480 and 620-710 ranges
+to avoid residual pigment absorption
 
 ```{r}
 tss_mgL = aos_df %>% filter(analyteid == "tss") %>% pull(analyteConcentration)
@@ -476,6 +516,22 @@ $\tilde{b}_b = b_b \times b_{TSM}(\lambda)$
 
 Chami et al 2005 study on scattering showed average $\tilde{b}_{bp}$ 4%,
 with high spectral variability (coastal waters)
+
+Giardino chapter eqn 5.2 for backscattering from particles
+
+$b_{b,p}(\lambda) = b_{b,p}(\lambda_{ref})\left( \frac{\lambda_{ref}}{\lambda} \right)^{-\gamma_{bb}}$
+
+$\gamma_{bb}$ is the power law exponent of particulate backscattering coefficient, can be related to the size of particles. low values (~0.3)
+for larger particles and higher values (~1.7) for smaller particles. 
+can also be an indicator of composition. High values with lower concentration
+compared to higher concentration TSS (0.71 for 5.95 g/m3 and 1.7 for 1.5 g/m3).
+
+Po River lakes study (n = 152 samples) showed $a_{NAP}(440)$ ranging from
+0.008 to 0.838 m^-1
+$S_{NAP}$ ranged from 0.02 to 0.005 nm^-1
+No relationship between S and a440, similar to boreal humic lakes and others
+
+average $\gamma_{bb}$ was 0.68
 
 > TODO: better model??
 
