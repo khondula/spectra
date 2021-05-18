@@ -1,0 +1,131 @@
+---
+title: "11-Empirical-AOPs"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(glue)
+library(tidyverse)
+library(readxl)
+library(fs)
+library(vroom)
+library(lubridate)
+```
+
+Comparing reflectance data to closest samples collected from each site
+
+* chl a
+* TSS
+* SUVA 254
+* SUVA 280
+* DOC
+
+```{r}
+all_overlaps_df <- read_csv("results/overlaps.csv")
+
+```
+
+Join with spectra
+
+> TODO: scale spectra by zenith angle (and surface factor?) to compare properly
+
+```{r}
+spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
+spectra_df <- fs::dir_ls(spectra_dir) %>% vroom(id = "filename")
+
+my_spectra_df$sitecode[1]
+
+my_spectra_df <- spectra_df %>% filter(my_cellid) %>%
+  mutate(sitecode = gsub("-buff5m.csv", "", basename(filename))) %>%
+  mutate(aq_site = substr(sitecode, 1, 4),
+         aop_yr = substr(sitecode, 6, 9)) %>%
+  mutate(aop_siteyear = glue("{aq_site}{aop_yr}")) %>%
+  dplyr::select(-filename)
+
+my_spectra_df2 <- my_spectra_df %>%
+  dplyr::select(aop_siteyear, wavelength, reflectance)
+
+spectra_join <- all_overlaps_df %>% left_join(my_spectra_df2, by = "aop_siteyear")
+```
+
+```{r}
+spectra_join %>%
+  dplyr::filter(analyteid == "SUVA254") %>%
+  dplyr::filter(analyteConcentration < 1) %>%
+  # dplyr::filter(wavelength %in% c(484, 489, 499)) %>% 
+  dplyr::filter(wavelength < 500) %>% 
+  ggplot(aes(x = analyteConcentration, y = reflectance)) +
+  geom_smooth(method = "lm") +
+  geom_point(aes(fill = aop_siteyear), pch = 21) +
+  # xlim(0, 1) +
+  facet_wrap(vars(wavelength), scales = "free")
+```
+
+```{r}
+spectra_join %>%
+  dplyr::filter(analyteid == "chla") %>%
+  dplyr::filter(analyte == "chlorophyll a") %>%
+  dplyr::filter(analyteConcentration < 20) %>%
+  # dplyr::filter(wavelength %in% c(412)) %>%
+  dplyr::filter(wavelength < 500) %>%
+  # dplyr::filter(wavelength %in% 500:600) %>%
+  # dplyr::filter(wavelength %in% 600:700) %>%
+  ggplot(aes(x = analyteConcentration, y = reflectance)) +
+  geom_smooth(method = "lm") +
+  geom_point(aes(fill = aop_siteyear), pch = 21, size = 2) +
+  # xlim(0, 1) +
+  theme_bw() +
+  facet_wrap(vars(wavelength), scales = "free")
+```
+
+
+## Relationships found in other studies
+
+* Menken et al 2006 - low reflectance with higher CDOM especially below 500 nm
+* Menken et al 2006 - **ratio of 700 nm/670 nm** best predictor of chl a over a 
+wide variety of conditions
+* Menken et al 2006 - **ratio of 670 nm/571 nm** best estimate of humic color
+* cited in Menken et al 2006, Gorden and Morel 1983 used ratio 440/550 to 
+estimate chl in oligotrophic waters
+* cited in Menken et al 2006, Strombeck and Pierson 2001 reported absorbance
+of red light can be significant at high CDOM concentrations
+
+* chl absorbance minimum near 440 nm (Gitelson et al 200)
+* carotenoids absorbance min at 490 nm (Yacobi et al 1995)
+* Green reflectance peak ~ 550 nm from green algae (absorb in red and blue
+but minimal absorbance in green)
+* reflectance minimum at 670 nm from chl a absorbance, also affected by 
+scattering from cell walls
+* reflectance peak at 700 nm from low chl a and strong scattering by algal 
+cell walls and other seston
+
+* chloroplatinate units from absorbance at 440 nm (Cuthbert and del 
+Giorgio 1992, cited in Menken et al 2006): CPU = 18.22 * (abs440) - 0.209
+
+* reflectance in blue region less sensitive to phytoplankton density
+because of absorbance by CDOM and particle scattering affecting 
+reflectance more than chl (Gitelson et al 2000)
+
+* Oceanography model based on reflectance at 412, 443, 488, 551 nm (Cardner
+et al 2003), for chl a < ~ 2 mg/m3. Above that, polynomial relationship
+based on **ratio of 488 and 551 nm**
+
+MODIS empirical equation for chl a from Carder et al 2003, also used in 
+Menken et al 2006
+
+$log(Chl a) = 0.711 + 1.62 \times log(R_{488}/R_{551}) + 7.686 \times log(R_{488}/R_{551})^2 + 4.09 \times log(R_{488}/R_{551})^3$
+
+Nonlinear forms based on wavelengths and ratios in Arenz et al 1996, 
+as in Menken et al 2006
+
+$chl a = a_0R^{a1}$
+$chl a = a_0R_{R}^{a1}$
+
+> Use relationships between grab samples and sensor data to estimate
+properties at time of AOP data collection
