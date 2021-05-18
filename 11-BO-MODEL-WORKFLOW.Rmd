@@ -99,30 +99,46 @@ bw is scattering coefficient
 ```{r}
 water3 <- read_excel("../../data/water-spectra/water-spectra-buiteveld94.xlsx")
 
-abs_water = data.frame(wl = water3$lambda_nm,
-                       absorb_m1 = water3$absorption_m1)
+abs_water <- approx(water3$lambda_nm, 
+                    water3$absorption_m1, 
+                    xout = 300:800) %>% as.data.frame() %>%
+  rename(wl = 1, absorb_m1 = 2)
+    
+# abs_water = data.frame(wl = water3$lambda_nm,
+#                        absorb_m1 = water3$absorption_m1)
 
-backs_water = data.frame(wl = water3$lambda_nm,
-                         backs_m1 = 0.5*(water3$scattering_m1))
+backs_water <- approx(water3$lambda_nm, 
+                    water3$scattering_m1, 
+                    xout = 300:800) %>% 
+  as.data.frame() %>%
+  mutate(backs_m1 = 0.5*y) %>%
+  rename(wl = 1) %>%
+    dplyr::select(wl, backs_m1)
+
+# abs_water %>% 
+#   left_join(backs_water) %>% write_csv("data/water-approx1nm.csv")
+
+# backs_water = data.frame(wl = water3$lambda_nm,
+#                          backs_m1 = 0.5*(water3$scattering_m1))
 
 
 aa <- ggplot(abs_water, aes(x = wl, y = absorb_m1)) + 
   scale_y_log10() +
-  geom_ribbon(aes(xmin = min(my_wavelengths_rs),
-                xmax = max(my_wavelengths_rs)),
-            fill = "green", alpha = 0.2) +
+  # geom_ribbon(aes(xmin = min(my_wavelengths_rs),
+  #               xmax = max(my_wavelengths_rs)),
+  #           fill = "green", alpha = 0.2) +
   geom_point() +
-  geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
-  geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
+  # geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
+  # geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
   ggtitle("Aborption by water (Buiteveld 94)") + theme_bw()
 
 bb <- ggplot(backs_water, aes(x = wl, y = backs_m1)) + 
-  geom_ribbon(aes(xmin = min(my_wavelengths_rs),
-                xmax = max(my_wavelengths_rs)),
-            fill = "green", alpha = 0.2) +
+  # geom_ribbon(aes(xmin = min(my_wavelengths_rs),
+  #               xmax = max(my_wavelengths_rs)),
+            # fill = "green", alpha = 0.2) +
   geom_point() + 
-  geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
-  geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
+  # geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
+  # geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
   ggtitle("1/2 scattering by water (Buiteveld 94") + theme_bw()
 
 cowplot::plot_grid(aa, bb)
@@ -153,6 +169,8 @@ my_wavelengths_water <- abs_water %>%
 ```
 
 > TODO: Rescale water spectra to wavelengths of rs data of vice versa
+
+Use `approx` for linear interpolation
 
 ## Solar zenith angle
 
@@ -288,6 +306,10 @@ Model from Lee et al 1998
 
 $a_{\phi}(\lambda) = \big[ a_0(\lambda) + a_1(\lambda) \times ln(a_{\phi}(440)) \big] a_{\phi}(440)$
 
+$a_{\phi}(440) = 0.06 \times [chla]^{-0.65}$
+
+chlorophyll a concentration, mg/m3 
+
 ```{r}
 leet2 <- read_csv('data/lee1998-t2_phy_abs_coeffs.csv')
 
@@ -300,14 +322,21 @@ lee_spectra <- leet2 %>%
 
 lee_spectra %>%
   ggplot(aes(x = wavelength, y = absorb1)) +
-  geom_line() +
+  # geom_line() +
   geom_point() +
-  geom_line(aes(y = absorb2), col = 'blue') +
+  # geom_line(aes(y = absorb2), col = 'blue') +
   geom_point(aes(y = absorb2), col = 'blue') +
-  geom_line(aes(y = absorb3), col = 'red') +
+  # geom_line(aes(y = absorb3), col = 'red') +
   geom_point(aes(y = absorb3), col = 'red') +
   theme_bw() +
   ggtitle('absorbance at abs440 = 0.5, 1, 2')
+
+# y <- lee_spectra$absorb1
+# x <- lee_spectra$wavelength
+# x <- 390:720
+approx(x, y, xout = 390:720) %>% as.data.frame()
+# plot(x, y, main = "approx(.) and approxfun(.)")
+# points(approx(x, y, xout = 390:720), col = 2, pch = "*")
 ```
 
 
