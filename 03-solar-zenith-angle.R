@@ -15,9 +15,16 @@ shp_dir <- '../../DATA/spatial'
 zenith_dir <- 'H:/DATA/zenith-angles'
 
 my_aq_site <- 'PRLA'
-my_aop_yr <- '2019'
+my_aop_yr <- '2020'
 my_loc_type <- 'buoy.c0'
 
+save_zenith_angle_data('PRPO', '2017')
+save_zenith_angle_data('PRLA', '2017')
+
+save_zenith_angle_data('BLUE', '2017')
+
+
+save_zenith_angle_data <- function(my_aq_site, my_aop_yr, my_loc_type = 'buoy.c0'){
 # get domain and aop site
 my_aop_site <- get_aop_dates(my_aq_site) %>% 
   pull(aop_site_id) %>% unique()
@@ -70,8 +77,7 @@ my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
 my_h5$ls()
 
 zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_zenith_angle')
-zenith_raster <- my_h5[[zenith_path]]$read() %>% 
-  raster()
+zenith_raster <- my_h5[[zenith_path]]$read() %>% raster()
 
 source('R/hs_mapinfo_zenith.R')
 
@@ -82,8 +88,8 @@ extent(zenith_raster) <- raster::extent(my_mapinfo[["xmin"]],
                                         my_mapinfo[["ymax"]])
 crs(zenith_raster) <- my_epsg
 
-zenith_raster
-plot(zenith_raster)
+# zenith_raster
+# plot(zenith_raster)
 # plot(my_buff5_sp, add = TRUE)
 
 # mask to buffered point
@@ -113,6 +119,7 @@ my_zeniths_df <- my_zeniths %>%
 zenith_path <- glue('{zenith_dir}/{my_aq_site}_{my_aop_yr}_{str_replace_all(my_loc_type, "[:punct:]", "")}-buff5m.csv')  
 my_zeniths_df %>% write_csv(zenith_path)
 
+}
 # weather_path <- glue('{my_aop_site}/Reflectance/Metadata/Ancillary_Imagery/Weather_Quality_Indicator')
 # weather_raster <- my_h5[[weather_path]]$read()
 # as.raster(weather_raster[3,,]) %>% str()
