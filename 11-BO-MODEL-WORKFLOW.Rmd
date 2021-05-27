@@ -16,15 +16,13 @@ library(readxl)
 library(lubridate)
 ```
 
-This is a test. 
-
 ```{r}
 my_aq_site <- "BLWA"
 my_aop_yr <- "2017"
 my_loc_type <- 'buoy.c0'
 ```
 
-## Measured Reflectance Spectra
+# Measured Reflectance Spectra
 
 ```{r}
 spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
@@ -49,52 +47,100 @@ my_wavelengths_rs <- my_spectra_pt$wavelength
 range(my_wavelengths_rs)
 ```
 
-> TODO: striping at the lowest measured wavelengths. real? waves?
+Shape of reflectance spectra could be qualitatively compared to optical water 
+typologies proposed by **Spyrakos et al 2018 L&O**
 
-> TODO: errors for PRLA (2017, 2019, 2020) and PRPO (2017) spectra
+> TODO: figure out min acceptable wavelengths in Rrs data
 
 > TODO: BLUE 2017 (spectra S2 point in the tree canopy)
 
-> TODO: TOOK 2019 reflectance not published
+> TODO: reflectance at stream sites. optically shallow?
 
-> TODO: FLNT 2019 reflectance not published
-
-> TODO: curate reflectance at stream sites. look at pics. optically shallow?
-
-For optically shallow waters, would also need bottom depth and bottom albedo,
+For optically shallow waters, would also need bottom depth and bottom albedo, 
 and diffuse attentuation coefficient ($K$).
 See eg. Albert and Mobey 2003 equations
 
-## Water Properties
+# Viewing parameters
 
-Can only model up to 800 nm based on extent of absorbance and backscattering
-spectra for water. (More absorbance data in Fewell?)
+> TODO: rescale Rrs based on zenith angles 
 
-Need to interpolate water spectra to wavelengths of rs data. 
-For now model abs and backs based on water wavelengths
+> TODO: investigate using PAR above and below 
+surface for refining surface factor
 
-backscattering coefficient is assumed HALF of scattering coefficient
-bbw = 0.5*bw
-bw is scattering coefficient
+## Surface factor 
 
-> absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
+* $R_{rs}(\lambda)$ (in $sr^{-1}$) is defined as the upwelling radiance 
+emerging from the water column divided by the downwelling irradiance 
+reaching the water surface
 
-> Pope and Fry 1997 (absorption 380-700 nm)
+* $R_{rs}(0-)$ is just below water surface
+* $R_{rs}(0+)$ is just above water surface
 
-* 2.5 nm resolution, also gives standard deviations
+Air-sea interface transfer coefficients from Lee et al 1999:
+
+$$R_{rs}(0+) = \frac{0.52 \times R_{rs}(0-)}{1-1.7 \times R_{rs}(0-)}$$
+
+
+Austin 1980 proposed the factor **0.544** for relating radiance 
+just above the surface with radiance just below the surface. 
+
+Austin, R.W., 1980. Gulf of Mexico, ocean-colour surface-truth measurements. Boundary-Layer Meteorol. 18, 269-285.
+
+## Solar zenith angle
+
+Eqn. 4.2 describes irradiance reflectance just below water surface,
+function of total absorption, total backscattering, and *C* which
+depends on solar zenith angle. *C* is a function of the cosine of the
+zenith angle of refracted photons ($\mu_0$). 
+
+$C(\mu_0) = -0.629\mu_0 + 0.975$
+
+```{r}
+zenith_dir <- "/Volumes/hondula/DATA/zenith-angles"
+zenith_file <- fs::dir_ls(zenith_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
+
+zenith_df <- read_csv(zenith_file)
+my_zenith_pt <- zenith_df %>% filter(my_cellid)
+my_zenith_pt$to_sensor_zenith_angle
+mu0 <- cos(my_zenith_pt$to_sensor_zenith_angle)
+mu0
+```
+
+# In situ data 
+
+Overlaps between in situ data and flights are determined in `10-overlaps`
+
+> TODO: Sensor to in situ regressions for chl a, turbidity, fDOM
+
+> TODO: Use phyto taxonomy to estimate proportion of algal divisions
+
+```{r}
+aos_df <- fs::dir_ls("results/overlaps", regexp = glue("*{my_aq_site}{my_aop_yr}")) %>%
+  map_df(~read_csv(.x))
+```
+
+# Water Properties
+
+* Use `approx` to interpolate published spectra to 1 nm.
+* Assume backscattering is half of scattering coefficient
+
+$b_{b,w} = 0.5 b_w$
+
+* more absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
+* Pope and Fry 1997 absorption 380-700 nm at 2.5 nm res,
+also with standard deviations
 * Comparison plot (Figure 10) to Buiteveld et al, Tam and Patel, Smith and Baker, and Sogandares and Fry
+* Buiteveld 1994 (absorption AND scattering 300-800 nm)
+* More absorbance data in Fewell?
 
-> Buiteveld 1994 (absorption and scattering 300-800 nm)
+* Buiteveld et al 1994 Table 1 has absorption and scattering coefficients at 20 C, also a proposed temperature dependence (A = absorption increment due to temperature) 
 
-* H.Buiteveld, J.H.M. Hakvoort, and M.Donze, “The optical properties of pure water,” in Ocean Optics XII, Proc. SPIE 2258, 174-183 (1994). 
-* Table 1 has absorption and scattering coefficients at 20 C, also a proposed temperature dependence (A = absorption increment due to temperature) 
-
-> Bukata CRC book table 4.1 (absorption and scattering 250-800 nm)
-
+* Bukata CRC book table 4.1 (absorption and scattering 250-800 nm)
 * Optical properties of pure water from multi-author Optics of the Ocean (Russian) 1983 and Smith and Baker 
+* Sogandares and Fry 1997 (Absorption and uncertainty for 10 nm increments 340 to 640 nm)
+* H.Buiteveld, J.H.M. Hakvoort, and M.Donze, "The optical properties of pure water," in Ocean Optics XII, Proc. SPIE 2258, 174-183 (1994). 
 
-> Sogandares and Fry 1997 (Absorption and uncertainty for 10 nm increments 340 to 640 nm)
-
+> TODO: consider using temperature dependence for water spectra?
 
 ```{r}
 water3 <- read_excel("../../data/water-spectra/water-spectra-buiteveld94.xlsx")
@@ -145,9 +191,10 @@ cowplot::plot_grid(aa, bb)
 
 ```
 
-Plots show range of reflectance data
+Plots also show range of reflectance data
 
 ```{r}
+# converting to lists 
 abs_water_list <- dplyr::select(abs_water, absorb_m1) %>%
   purrr::transpose(.names = glue('wl{abs_water$wl}')) %>%
   purrr::map(~as.numeric(unlist(.x)))
@@ -168,50 +215,10 @@ my_wavelengths_water <- abs_water %>%
 
 ```
 
-> TODO: Rescale water spectra to wavelengths of rs data of vice versa
 
-Use `approx` for linear interpolation
+# Absorbance
 
-## Solar zenith angle
-
-Eqn. 4.2 describes irradiance reflectance just below water surface,
-function of total absorption, total backscattering, and *C* which
-depends on solar zenith angle. *C* is a function of the cosine of the
-zenith angle of refracted photons ($mu_0$). 
-
-$C(mu_0)$ = -0.629$mu_0$ + 0.975
-
-```{r}
-zenith_dir <- "/Volumes/hondula/DATA/zenith-angles"
-zenith_file <- fs::dir_ls(zenith_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
-
-zenith_df <- read_csv(zenith_file)
-my_zenith_pt <- zenith_df %>% filter(my_cellid)
-my_zenith_pt$to_sensor_zenith_angle
-mu0 <- cos(my_zenith_pt$to_sensor_zenith_angle)
-mu0
-```
-
-## Surface factor 
-
-Austin 1980 proposed the factor 0.544 for relating radiance just above the 
-surface with radiance just below the surface. 
-
-Austin, R.W., 1980. Gulf of Mexico, ocean-colour surface-truth measurements. Boundary-Layer
-Meteorol. 18, 269-285.
-
-> TODO: investigate using PAR above and below surface for refining this factor
-
-
-## In situ data 
-
-use site-year ID to get in situ data. Overlaps are determined in `10-overlaps`
-
-```{r}
-aos_df <- fs::dir_ls("results/overlaps", regexp = glue("*{my_aq_site}{my_aop_yr}")) %>%
-  map_df(~read_csv(.x))
-```
-
+* Total absorbance sum of water, CDOM, phytoplankton, and non-algal material
 
 ## Phytoplankton Absorbance
 
@@ -339,19 +346,6 @@ approx(x, y, xout = 390:720) %>% as.data.frame()
 # points(approx(x, y, xout = 390:720), col = 2, pch = "*")
 ```
 
-
-## Phytoplankton backscattering
-
-> TODO: model for this?
-
-Sometimes included in the scattering and backscattering coefficients for 
-suspended matter
-
-```{r}
-chla_df <- aos_df %>% filter(analyteid == "chla")
-```
-
-
 ## CDOM absorbance
 
 Colored dissolved organic matter, also known as gelbstoff, yellow substance,
@@ -372,6 +366,12 @@ $Y = a_{CDOM}(\lambda_{0})[m^{-1}]$
    or 412, 443 (central wavelength of satellite bands)
 * SF: slope factor
    **indicator of MW, source, etc**
+   
+Range for slope parameter: 275-295, 350-400 (**Helms et al 2008**,
+shows relation to DOM MW and photobleaching)
+
+Gaussian decomposition method important for terrestrially influence
+(**Grunert et al 2018**) especially based on lignin absorbance ~ 276 nm
 
 SF = 0.014 nm-1 at reference wl 440 nm in Bricaud et al 1981
 but varies geographically and temporally, also depends on
@@ -391,6 +391,11 @@ slope had very narrow range around 0.0176/nm, SD = 0.0020
    
 SUVA 254 = abs[254]/DOC
 absREF is absorbance at reference wavelength
+
+* Empirical relationships between $a_{CDOM}(350)$ and $a(\lambda)$ 
+for 254, 280, 300, 330, 375, 440 in **Zhang et al 2021 STE**. Highly
+significant correlations based on large dataset (n = 766) of lake, river,
+reservoir samples. 
 
 > TODO: Estimate at time of flight using relationship with fDOM?
 
@@ -460,7 +465,7 @@ my_spectra %>%
 # abs_cdom$wl382
 ```
 
-## Flourescence
+## Flourescence of CDOM
 
 > TODO: model??
 
@@ -512,6 +517,21 @@ to avoid residual pigment absorption
 tss_mgL = aos_df %>% filter(analyteid == "tss") %>% pull(analyteConcentration)
 tss_mgL
 
+```
+
+# Backscattering
+
+* Total backscattering sum of water, phytoplankton, and non-algal material
+
+## Phytoplankton backscattering
+
+> TODO: model for this?
+
+Sometimes included in the scattering and backscattering coefficients for 
+suspended matter
+
+```{r}
+chla_df <- aos_df %>% filter(analyteid == "chla")
 ```
 
 ## Suspended matter backscattering
@@ -619,11 +639,7 @@ surface_factor = 0.544
 # rD[] = 0.544 * C_mu0 * (backs[] / (absorb[] + backs[]))
 ```
 
-No TSS so ignore for now
-
 Thought I was being fancy with the lists but cant figure out list_merge
-
-> TODO: remove list structure for water spectra
 
 ```{r}
 
@@ -700,3 +716,10 @@ abcd
 # cowplot::save_plot("figs/test-model.png", abcd)
 ```
 
+# Next steps
+
+Get parameters for each site (slope factors, etc.)
+
+Input spectra --> fitted model with site parameters  --> estimate CDOM absorbance
+
+Extract spectra from broader area --> estimate CDOM absorbance
