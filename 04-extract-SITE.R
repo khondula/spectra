@@ -25,18 +25,24 @@ my_aop_site <- 'WOOD'
 my_domain <- 'D09'
 my_aq_polygon <- 'PRLA_2016'
 
-# not working
-save_spectra('PRLA', '2017', 'WOOD', 'PRLA_2016', 'D09', 100)
-save_spectra('PRLA', '2019', 'WOOD', 'PRLA_2016', 'D09', 100)
-save_spectra('PRLA', '2020', 'WOOD', 'PRLA_2016', 'D09', 100)
+# maybe working
+# save_spectra('PRLA', '2017', 'WOOD', 'PRLA_2016', 'D09', 100)
+# save_spectra('PRLA', '2019', 'WOOD', 'PRLA_2016', 'D09', 100)
+# save_spectra('PRLA', '2020', 'WOOD', 'PRLA_2016', 'D09', 100)
 
-save_spectra('PRPO', '2017', 'WOOD', 'PRPO_2016', 'D09', 100)
-save_spectra('PRPO', '2019', 'WOOD', 'PRPO_2016', 'D09', 100)
-save_spectra('PRPO', '2020', 'WOOD', 'PRPO_2016', 'D09', 100)
+# save_spectra('PRPO', '2017', 'WOOD', 'PRPO_2016', 'D09', 100)
+# save_spectra('PRPO', '2019', 'WOOD', 'PRPO_2016', 'D09', 100)
+# save_spectra('PRPO', '2020', 'WOOD', 'PRPO_2016', 'D09', 100)
 
 #
 save_spectra('CRAM', '2019', 'UNDE', 'CRAM_2015', 'D05', 100)
 save_spectra('TOOK', '2018', 'TOOL', 'TOOK_2016', 'D18', 100)
+save_spectra('FLNT', '2017', 'JERC', 'FLNT_2017', 'D03', 100)
+save_spectra('FLNT', '2018', 'JERC', 'FLNT_2017', 'D03', 100)
+save_spectra('FLNT', '2019', 'JERC', 'FLNT_2017', 'D03', 100)
+save_spectra('BLWA', '2019', 'DELA', 'BLWA_2019', 'D08', 100)
+save_spectra('TOMB', '2018', 'LENO', 'TOMB_2017', 'D08', 100)
+
 
 # save_spectra('BARC', '2018', 'OSBS', 'BARC_2018', 'D03', 100)
 # save_spectra('BARC', '2019', 'OSBS', 'BARC_2018', 'D03', 100)
@@ -123,7 +129,7 @@ if(length(my_h5_files) > 1){
 # extract spectra from pixels within the polygon
 my_pt_spatvec <- my_aq_prj_sp %>% as('SpatVector')
 
-my_hs_terra <- my_h5 %>% terra::rast()
+my_hs_terra <- my_h5
 
 message('extracting pixel values now')
 
@@ -162,20 +168,20 @@ my_spectra_df %>%
   vroom::vroom_write(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}.tsv'))
 
 bands_to_plot <- seq(1, 100, length.out = 12)
-bands_to_plot <- 65:100
+# bands_to_plot <- 65:100
 # my_h5 <- hs_read(my_h5_files, bands = bands_to_plot)
 # names(my_h5) <- hs_wavelength(my_h5_files, bands = bands_to_plot)
 
-my_aq_prj_buff <- st_buffer(my_aq_prj, -150)
-my_h5_bands <- raster::subset(my_h5, subset = bands_to_plot)
-my_hs_crop <- raster::crop(my_h5_bands, my_aq_prj_buff)
-my_hs_crop <- raster::crop(my_h5_bands, my_aq_prj)
+my_aq_prj_buff <- st_buffer(my_aq_prj, 0)
+my_h5_bands <- terra::subset(my_h5, subset = bands_to_plot)
+my_hs_crop <- terra::crop(my_h5_bands, my_aq_prj_buff)
+# my_hs_crop <- raster::crop(my_h5_bands, my_aq_prj)
 hs_crop_stars <- my_hs_crop %>% st_as_stars()
 
-test_raster <- hs_crop_stars %>% as("Raster")
-library(leaflet)
-library(mapview)
-mapview(test_raster)
+# test_raster <- hs_crop_stars %>% as("Raster")
+# library(leaflet)
+# library(mapview)
+# mapview(test_raster)
 
 gg <- ggplot() +
   geom_stars(data = hs_crop_stars) +
@@ -187,8 +193,8 @@ gg <- ggplot() +
   scale_fill_scico(palette = 'romaO') +
   # scale_fill_scico(palette = 'davos') +
   ggtitle(glue('{my_aq_site} {my_aop_yr}'))
-gg
-ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}-glint.pdf'), plot = gg, width = 10, height = 8)
+# gg
+# ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}-glint.pdf'), plot = gg, width = 10, height = 8)
 
 # ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}_firstbands.pdf'), plot = gg, width = 10, height = 8)
 ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}.pdf'), plot = gg, width = 10, height = 8)
