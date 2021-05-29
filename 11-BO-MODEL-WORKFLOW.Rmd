@@ -26,6 +26,22 @@ my_loc_type <- 'buoy.c0'
 
 # Measured Reflectance Spectra
 
+https://oceancolor.gsfc.nasa.gov/atbd/
+https://oceancolor.gsfc.nasa.gov/atbd/rrs/
+https://oceancolor.gsfc.nasa.gov/docs/technical/#WP
+https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1-surface-reflectance
+http://snr.unl.edu/agmet/brdf/brdf-definition.asp
+
+### Some definitions:
+
+**Reflectance** (dimensionless) at depth z is upwelling irradiance (flux per unit surface area) over downwelling irradiance:
+
+$R(\lambda, z) = \frac{E_u(\lambda, z)}{E_d(\lambda, z)}$
+
+**Scalar irradiance** $(E_0)$ is the flux received by a spherical collector from all directions. This concept (how flux varies by direction) is needed to account for the portion of the signal that the sensor sees compared to all of the water-leaving irradiance.
+
+**Radiance** measures flux per unit area and per unit solid angle. $L(\theta, \phi)$ is the radiance in direction of zenith (vertical) angle $\theta$ and azimuth (horizontal) angle $\phi$. Integrate $L$ over the appropriate angles to get **irradiance**. 
+
 ```{r}
 spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
 spectra_file <- fs::dir_ls(spectra_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
@@ -56,6 +72,8 @@ typologies proposed by **Spyrakos et al 2018 L&O**
 and reflectance peak ~700 nm from min sum of total absorb.
 
 > TODO: figure out min acceptable wavelengths in Rrs data
+
+> TODO: Extract longer wavelengths for glint removal
 
 > TODO: BLUE 2017 (spectra S2 point in the tree canopy)
 
@@ -115,10 +133,27 @@ mu0 <- cos(my_zenith_pt$to_sensor_zenith_angle)
 mu0
 ```
 
-> TODO: GLINT REMOVAL
+# SUN GLINT REMOVAL
 
-This is a whole thing. Based on idea that residual radiance in NIR 
-(~700 - 900 nm) is from glint
+The reflectance value of interest for aquatic purposes is the ratio
+of water leaving radiance to downwelling planar irradiance:
+
+$R_{rs} = \frac{L_w(0^+)}{E_d(0^+)}$
+
+Sensor measurement is upwelling radiance $L_u$, which includes
+both $L_w$ and reflected radiance from the water surface $L_r$ which
+has not interacted with the water column and needs to be removed. 
+
+$L_u = L_w + L_r$
+
+The remote sensing ratio is $r_{rs} = \frac{L_u(z)}{E_d(z)}$
+
+
+
+Based on idea that residual radiance in NIR (~700 - 1000 nm) 
+is from glint, because water leaving reflectance from bottom 
+and water column ($R_w = R_b + R_c$) should be negligible. 
+Difficult to meet this assumption (deep enough waters) in rivers. 
 
 * Hochberg et al 2003 method gets relative glint intensity from 
 darkest and brightest pixels in NIR scaled by absolute glint intensity
@@ -127,23 +162,29 @@ masking land and clouds. Not good for water < 2 m where zero water
 leaving radiance in NIR is not valid, i.e. overcorrects shallow water 
 imagery. Essentially models a constant NIR brightness to be removed. 
 
-* Hedley et al 2005 assumes a linear relationship between a NIR band and 
+* **Hedley et al 2005** assumes a linear relationship between a NIR band and 
 each visible band to remove glint contribution. Establish a regression
 between NIR brightness and amount of sun glint in each visible band. 
 First, select area with visible sun glint but deep water where underlying
 spectral brightness should be constant. Then for each $\lambda$ in visible,
 regress NIR brightness to visible band brightness. Get Minimum NIR value
-of image/sample, and calculate deglinted Rrs via: 
+of image/sample, and calculate deglinted for band $i$ Rrs via slope $b_i$: 
 
+$R_i^\prime = R_i - b_i(R_{NIR} - Min_{NIR})$
 
+Need to make sure there are no non-submerged areas. Overstreet and 
+Legleiter use the 5% of NIR values in deep water subset to get 
+$R_{min}$ (min NIR)
 
 * Kutser et al 2009 assume glint at 760 nm, and the depth of the absorption
-feature at 760 nm is proportional to glint:
+feature at 760 nm is proportional to sun glint (no sun glint or oxygen 
+absorption feature when NIR is all attenuated in water, but contaminated
+pixels will have feature proportional to the intensity of glint):
 
 $D = \frac{R(739) + R(860)}{2} - R(760)$
 
 * The upwelling radiance spectra will increase dramatically due to glint
-when sun is low (zenith angles are beyond 60 degrees)
+when sun is low (zenith angles are beyond 60 degrees). 
 
 # In situ data 
 
@@ -260,7 +301,7 @@ my_wavelengths_water <- abs_water %>%
 * Total absorbance is sum of water, CDOM, phytoplankton, and detritus 
 (non-algal portion of total suspended material)
 
-$a_{tot}(\lambda) = a_{w}(\lambda) + a_{CDOM}(\lambda) + a_{phy}(\lambda) + a_{SM}(\lambda)$
+$a_{tot}(\lambda) = a_{w}(\lambda) + a_{CDOM}(\lambda) + a_{phy}(\lambda) + a_{NAP}(\lambda)$
 
 ## Phytoplankton Absorbance
 
