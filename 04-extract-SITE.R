@@ -103,7 +103,7 @@ my_spectra_df <- my_spectra %>%
   mutate(x = terra::xFromCell(my_hs_terra, cell),
          y = terra::yFromCell(my_hs_terra, cell)) %>%
   group_by(cell) %>%
-  pivot_longer(cols = starts_with('band'), 
+  tidyr::pivot_longer(cols = starts_with('band'), 
                names_to = 'band', 
                values_to = 'reflectance') %>% 
   tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
