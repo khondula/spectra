@@ -31,16 +31,49 @@ https://oceancolor.gsfc.nasa.gov/atbd/rrs/
 https://oceancolor.gsfc.nasa.gov/docs/technical/#WP
 https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1-surface-reflectance
 http://snr.unl.edu/agmet/brdf/brdf-definition.asp
+https://dnr.wisconsin.gov/topic/lakes/clmn/remotesensing/futuredirections.html
+http://www.eo4geo.eu/training/fundaments-of-optical-remote-sensing/
 
 ### Some definitions:
 
 **Reflectance** (dimensionless) at depth z is upwelling irradiance (flux per unit surface area) over downwelling irradiance:
 
-$R(\lambda, z) = \frac{E_u(\lambda, z)}{E_d(\lambda, z)}$
+$$R(\lambda, z) = \frac{E_u(\lambda, z)}{E_d(\lambda, z)}$$
+
 
 **Scalar irradiance** $(E_0)$ is the flux received by a spherical collector from all directions. This concept (how flux varies by direction) is needed to account for the portion of the signal that the sensor sees compared to all of the water-leaving irradiance.
 
 **Radiance** measures flux per unit area and per unit solid angle. $L(\theta, \phi)$ is the radiance in direction of zenith (vertical) angle $\theta$ and azimuth (horizontal) angle $\phi$. Integrate $L$ over the appropriate angles to get **irradiance**. 
+
+**Remote sensing reflectance** ($sr^-1$) uses upwelling radiance instead of irradiance and is defined as:
+
+$$R_{RS}(\theta, \phi, \lambda, 0) = \frac{L(\theta, \phi, \lambda, 0)}{E_d(\lambda, 0)}$$
+A proportionality factor $Q(\theta, \phi, \lambda)$ in units of [sr] can relate $R_{RS}$ to $R$.
+
+Reflectance at water surface is a function of backscattering coefficient and absorption coefficient:
+
+$$R(0) = f \frac{b_b}{(a + b_b)}$$
+
+**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface:
+
+$$r_{rs}(\lambda) = \frac{L_u(0^-,\lambda)}{E_d(0^-,\lambda)} = g_1\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) + g_2\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg)^2$$
+NEON measurements are non-dimensional reflectance. Get **surface remote sensing reflectance** (in [$sr^{-1}$]) dividing by pi:
+
+$$R^w_{RS} = \frac{\rho_w}{\pi}$$
+
+$\pi$ is the light distribution factor ($Q = \frac{E_u}{L_u}$ [$sr^{-1}$]), assuming an *isotropic light field*, where light is reflected evenly in all directions: 
+
+![](http://www.gisresources.com/wp-content/uploads/2013/08/isotropy.jpg)
+
+Remote sensing reflecatance at the surface ($R_{rs}$) can be related to the subsurface $r_{rs}$ as (Mobley 1994, Lee et al 1998):
+
+$$R_{rs} = \frac{\zeta \cdot r_{rs}(\lambda)}{1 - \Gamma \cdot r_{rs}(\lambda)} + R^{surf}_{rs}(\lambda) $$
+
+* $\zeta$ is the water-to-air divergence factor, ~0.52
+
+* $\Gamma$ accounts for the effects of internal reflection from the water surface, ~1.6
+
+* $R^{surf}_{rs}(\lambda)$ is reflections at the water surface (glint)
 
 ```{r}
 spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
@@ -50,7 +83,7 @@ spectra_df <- read_csv(spectra_file)
 my_spectra_pt <- spectra_df %>% filter(my_cellid)
 
 rrs <- spectra_df %>%
-  ggplot(aes(wavelength, reflectance)) +
+  ggplot(aes(wavelength, reflectance/pi)) +
   geom_line(aes(group = cell)) +
   geom_line(data = my_spectra_pt, col = "green", lwd = 1) +
   theme_bw() +
@@ -79,22 +112,31 @@ and reflectance peak ~700 nm from min sum of total absorb.
 
 > TODO: reflectance at stream sites. optically shallow?
 
-For optically shallow waters, would also need bottom depth and bottom albedo, 
-and diffuse attentuation coefficient ($K$).
+For optically shallow waters, would also need bottom depth and bottom albedo,  and diffuse attentuation coefficient ($K$).
 See eg. Albert and Mobey 2003 equations
 
-Measured reflectance spectra need to be corrected for air-water interface
-and normalization of $R^{+}_{rs}$ to zenith illumination and viewing
-geometry to get **normalized water-leaving reflectance**: $[R_w]_N$
+Measured reflectance spectra need to be corrected for air-water interface and normalization of $R^{+}_{rs}$ to zenith illumination and viewing geometry to get **normalized water-leaving reflectance**: $[R_w]_N$
 
-# Reflectance Normalization
-
-> TODO: rescale Rrs based on zenith angles 
-
-> TODO: investigate using PAR above and below 
-surface for refining surface factor
 
 ## Surface factor 
+
+> TODO: investigate using PAR above and below surface
+
+$K_d$ is an apparent optical property, diffuse attenuation under water, that depends on viewing/illumination geometry. PAR and uPAR (underwater PAR) comparison could potentially be used to separately estimate $a(\lambda)$ and $b_b(\lambda)$.
+
+Gordon 1989 model: 
+
+$$K_d(\lambda) = \kappa \bigg(\frac{a(\lambda) + b_b(\lambda)}{cos\theta'_{sun}}\bigg)$$
+$\kappa \approx 1.0546$
+$theta'_{sun}$ is sun zenith angle in water
+
+Lee 2005 model: 
+
+$$K_d(\lambda) = m_0\cdot a(\lambda) + m_1(1 - m_2 e^{-m_3 \cdot a(\lambda)})(b_b(\lambda))$$
+$m_0 = 1 + 0.005 \cdot \theta_{sun}$ (sun zenith angle in air)
+$m_1 = 4.18$, $m_2 = 0.52$, $m_3 = 10.8$
+
+
 
 * $R_{rs}(\lambda)$ (in $sr^{-1}$) is defined as the upwelling radiance 
 emerging from the water column divided by the downwelling irradiance 
@@ -247,13 +289,14 @@ backs_water <- approx(water3$lambda_nm,
 # backs_water = data.frame(wl = water3$lambda_nm,
 #                          backs_m1 = 0.5*(water3$scattering_m1))
 
+water_df <- read_csv("data/water-approx1nm.csv")
 
 aa <- ggplot(abs_water, aes(x = wl, y = absorb_m1)) + 
   scale_y_log10() +
   # geom_ribbon(aes(xmin = min(my_wavelengths_rs),
   #               xmax = max(my_wavelengths_rs)),
   #           fill = "green", alpha = 0.2) +
-  geom_point() +
+  geom_line() +
   # geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
   # geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
   ggtitle("Aborption by water (Buiteveld 94)") + theme_bw()
@@ -262,12 +305,32 @@ bb <- ggplot(backs_water, aes(x = wl, y = backs_m1)) +
   # geom_ribbon(aes(xmin = min(my_wavelengths_rs),
   #               xmax = max(my_wavelengths_rs)),
             # fill = "green", alpha = 0.2) +
-  geom_point() + 
+  geom_line() + 
   # geom_vline(aes(xintercept = min(my_wavelengths_rs))) +
   # geom_vline(aes(xintercept = max(my_wavelengths_rs))) +
-  ggtitle("1/2 scattering by water (Buiteveld 94") + theme_bw()
+  ggtitle("1/2 scattering by water (Buiteveld 94)") + 
+  theme_bw()
 
-cowplot::plot_grid(aa, bb)
+g1 = 0.949 # eqn 8.1
+g2 = 0.794 # eqn 8.1
+water_df <- water_df %>%
+  mutate(u = (backs_m1/(absorb_m1 + backs_m1))) %>%
+  mutate(rrs = g1*u + g2*u^2) %>%
+  mutate(Rrs = (0.52 * rrs)/(1-1.6*rrs)) %>%
+  mutate(Rrs2 = (0.54*rrs)/(1-1.7*rrs))
+
+uu <- ggplot(water_df, aes(x = wl, y = u)) +
+  geom_line() +
+  geom_line(aes(y = rrs), col = 'red') +
+  geom_line(aes(y = Rrs), col = 'blue') +
+  geom_line(aes(y = Rrs2), col = 'blue', lty = 2) +
+  ylab("Rrs (sr-1)") +
+  ggtitle("u = black, rrs = red, Rrs = blue (no glint)") + 
+  theme_bw()
+uu
+
+cowplot::plot_grid(aa, bb, uu, ncol = 1)
+ggsave('figs/pure-water-rrs.png', width = 4, height = 7)
 
 ```
 
@@ -327,6 +390,8 @@ Unit conversion: m2/mg * ug/L = 1/m
 chla = sum of chl a AND pheophytin (Albert and Mobley 2003)
 
 specific absorption coefficients from Gege WASI program
+
+![](figs/astar-phyto-gege.png)
 
 > TODO: Use taxonomy info for separate peaks?
 
@@ -451,6 +516,10 @@ eqn 4.1 - absorption coefficient of CDOM
 
 abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
 
+$a_{CDOM}(\lambda) = a_{CDOM}(\lambda_0) \times {exp}( -S \times (\lambda - \lambda_{0}))$
+
+mean values for $S$ are 0.016 $nm^{-1}$, sd 0.002 $nm^{-1}$, variation is due to composition. Range 0.008 - 0.042 $nm^{-1}$
+
 $a^*_{CDOM}(\lambda) = exp\left\{ -S \times (\lambda - \lambda_{0})\right\}$
 
 So CDOM concentration (Y) (proxy for DOC) expressed in units of absorption 
@@ -569,6 +638,8 @@ my_spectra %>%
 > TODO:
 
 * flourescence emission band for CHL around 681 nm (Gower et al 1999)
+
+Fluorescence by dissolved organic matter influences the blue part of the spectrum, with a centre wavelength ∼ 430 nm, whereas phycoerythrin fluorescence is centred around 585nm, and chlorophyll-a fluorescence at about 685nm.
 
 ## Suspended matter absorbance
 
