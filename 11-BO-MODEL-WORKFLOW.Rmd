@@ -1,8 +1,10 @@
 ---
 title: "Bio-Optical Model"
 output:
+  pdf_document:
+    toc: yes
   html_document:
-    toc: true
+    toc: yes
 editor_options:
   chunk_output_type: console
 ---
@@ -26,13 +28,15 @@ my_loc_type <- 'buoy.c0'
 
 # Measured Reflectance Spectra
 
-https://oceancolor.gsfc.nasa.gov/atbd/
-https://oceancolor.gsfc.nasa.gov/atbd/rrs/
-https://oceancolor.gsfc.nasa.gov/docs/technical/#WP
-https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1-surface-reflectance
-http://snr.unl.edu/agmet/brdf/brdf-definition.asp
-https://dnr.wisconsin.gov/topic/lakes/clmn/remotesensing/futuredirections.html
-http://www.eo4geo.eu/training/fundaments-of-optical-remote-sensing/
+**helpful links**
+
+* https://oceancolor.gsfc.nasa.gov/atbd/
+* https://oceancolor.gsfc.nasa.gov/atbd/rrs/
+* https://oceancolor.gsfc.nasa.gov/docs/technical/#WP
+* https://www.usgs.gov/core-science-systems/nli/landsat/landsat-collection-1-surface-reflectance
+* http://snr.unl.edu/agmet/brdf/brdf-definition.asp
+* https://dnr.wisconsin.gov/topic/lakes/clmn/remotesensing/futuredirections.html
+* http://www.eo4geo.eu/training/fundaments-of-optical-remote-sensing/
 
 ### Some definitions:
 
@@ -48,7 +52,7 @@ $$R(\lambda, z) = \frac{E_u(\lambda, z)}{E_d(\lambda, z)}$$
 **Remote sensing reflectance** ($sr^-1$) uses upwelling radiance instead of irradiance and is defined as:
 
 $$R_{RS}(\theta, \phi, \lambda, 0) = \frac{L(\theta, \phi, \lambda, 0)}{E_d(\lambda, 0)}$$
-A proportionality factor $Q(\theta, \phi, \lambda)$ in units of [sr] can relate $R_{RS}$ to $R$.
+A proportionality factor $Q(\theta, \phi, \lambda)$ in units of [sr] can relate $R_{RS}$ to $R$. (also called the light distribution factor).
 
 Reflectance at water surface is a function of backscattering coefficient and absorption coefficient:
 
@@ -63,17 +67,34 @@ $$R^w_{RS} = \frac{\rho_w}{\pi}$$
 
 $\pi$ is the light distribution factor ($Q = \frac{E_u}{L_u}$ [$sr^{-1}$]), assuming an *isotropic light field*, where light is reflected evenly in all directions: 
 
-![](http://www.gisresources.com/wp-content/uploads/2013/08/isotropy.jpg)
+![](figs/isotropy.jpeg)
 
 Remote sensing reflecatance at the surface ($R_{rs}$) can be related to the subsurface $r_{rs}$ as (Mobley 1994, Lee et al 1998):
 
 $$R_{rs} = \frac{\zeta \cdot r_{rs}(\lambda)}{1 - \Gamma \cdot r_{rs}(\lambda)} + R^{surf}_{rs}(\lambda) $$
 
-* $\zeta$ is the water-to-air divergence factor, ~0.52
+* $\zeta$ is the water-to-air divergence factor, approx 0.52
 
-* $\Gamma$ accounts for the effects of internal reflection from the water surface, ~1.6
+* $\Gamma$ accounts for the effects of internal reflection from the water surface,  approx 1.6
 
 * $R^{surf}_{rs}(\lambda)$ is reflections at the water surface (glint)
+
+* $R_{rs}(\lambda)$ (in $sr^{-1}$) is defined as the upwelling radiance 
+emerging from the water column divided by the downwelling irradiance 
+reaching the water surface
+
+* $R_{rs}(0-)$ is just below water surface
+* $R_{rs}(0+)$ is just above water surface
+
+Air-sea interface transfer coefficients from Lee et al 1999:
+
+$$R_{rs}(0+) = \frac{0.52 \times R_{rs}(0-)}{1-1.7 \times R_{rs}(0-)}$$
+
+
+Austin 1980 proposed the factor **0.544** for relating radiance 
+just above the surface with radiance just below the surface. 
+
+Austin, R.W., 1980. Gulf of Mexico, ocean-colour surface-truth measurements. Boundary-Layer Meteorol. 18, 269-285.
 
 ```{r}
 spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
@@ -102,7 +123,7 @@ range(my_wavelengths_rs)
 typologies proposed by **Spyrakos et al 2018 L&O**
 
 * Chl retrieval algorithms make use of chl absorption peaks at 442, 665,
-and reflectance peak ~700 nm from min sum of total absorb.
+and reflectance peak around 700 nm from min sum of total absorb.
 
 > TODO: figure out min acceptable wavelengths in Rrs data
 
@@ -128,32 +149,13 @@ Gordon 1989 model:
 
 $$K_d(\lambda) = \kappa \bigg(\frac{a(\lambda) + b_b(\lambda)}{cos\theta'_{sun}}\bigg)$$
 $\kappa \approx 1.0546$
-$theta'_{sun}$ is sun zenith angle in water
+$\theta'_{sun}$ is sun zenith angle in water
 
 Lee 2005 model: 
 
 $$K_d(\lambda) = m_0\cdot a(\lambda) + m_1(1 - m_2 e^{-m_3 \cdot a(\lambda)})(b_b(\lambda))$$
 $m_0 = 1 + 0.005 \cdot \theta_{sun}$ (sun zenith angle in air)
 $m_1 = 4.18$, $m_2 = 0.52$, $m_3 = 10.8$
-
-
-
-* $R_{rs}(\lambda)$ (in $sr^{-1}$) is defined as the upwelling radiance 
-emerging from the water column divided by the downwelling irradiance 
-reaching the water surface
-
-* $R_{rs}(0-)$ is just below water surface
-* $R_{rs}(0+)$ is just above water surface
-
-Air-sea interface transfer coefficients from Lee et al 1999:
-
-$$R_{rs}(0+) = \frac{0.52 \times R_{rs}(0-)}{1-1.7 \times R_{rs}(0-)}$$
-
-
-Austin 1980 proposed the factor **0.544** for relating radiance 
-just above the surface with radiance just below the surface. 
-
-Austin, R.W., 1980. Gulf of Mexico, ocean-colour surface-truth measurements. Boundary-Layer Meteorol. 18, 269-285.
 
 ## Solar zenith angle
 
@@ -192,7 +194,7 @@ The remote sensing ratio is $r_{rs} = \frac{L_u(z)}{E_d(z)}$
 
 
 
-Based on idea that residual radiance in NIR (~700 - 1000 nm) 
+Based on idea that residual radiance in NIR (around 700 - 1000 nm) 
 is from glint, because water leaving reflectance from bottom 
 and water column ($R_w = R_b + R_c$) should be negligible. 
 Difficult to meet this assumption (deep enough waters) in rivers. 
@@ -247,6 +249,8 @@ aos_df <- fs::dir_ls("results/overlaps", regexp = glue("*{my_aq_site}{my_aop_yr}
 * Assume backscattering is half of scattering coefficient
 
 $b_{b,w} = 0.5 b_w$
+
+![](figs/pure-water-rrs.png)
 
 * more absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
 * Pope and Fry 1997 absorption 380-700 nm at 2.5 nm res,
@@ -539,7 +543,7 @@ Range for slope parameter: 275-295, 350-400 (**Helms et al 2008**,
 shows relation to DOM MW and photobleaching)
 
 Gaussian decomposition method important for terrestrially influence
-(**Grunert et al 2018**) especially based on lignin absorbance ~ 276 nm
+(**Grunert et al 2018**) especially based on lignin absorbance around 276 nm
 
 SF = 0.014 nm-1 at reference wl 440 nm in Bricaud et al 1981
 but varies geographically and temporally, also depends on
@@ -738,18 +742,18 @@ n is around zero in shallow and inland waters
 $b^*_{TSM}$ values are around 0.5 to 1.0 m2/g at $\lambda_S$ = 555 nm
 
 ratio of BACKscattering to total scattering is 0.2-3 % and assumed constant 
-over visible range
-$\tilde{b}_b = b_b \times b_{TSM}(\lambda)$
+over visible range (tilde missing)
+${b}_b = b_b \times b_{TSM}(\lambda)$
 
-Chami et al 2005 study on scattering showed average $\tilde{b}_{bp}$ 4%,
+Chami et al 2005 study on scattering showed average ${b}_{bp}$ 4%,
 with high spectral variability (coastal waters)
 
 Giardino chapter eqn 5.2 for backscattering from particles
 
 $b_{b,p}(\lambda) = b_{b,p}(\lambda_{ref})\left( \frac{\lambda_{ref}}{\lambda} \right)^{-\gamma_{bb}}$
 
-$\gamma_{bb}$ is the power law exponent of particulate backscattering coefficient, can be related to the size of particles. low values (~0.3)
-for larger particles and higher values (~1.7) for smaller particles. 
+$\gamma_{bb}$ is the power law exponent of particulate backscattering coefficient, can be related to the size of particles. low values (approx 0.3)
+for larger particles and higher values (approx 1.7) for smaller particles. 
 can also be an indicator of composition. High values with lower concentration
 compared to higher concentration TSS (0.71 for 5.95 g/m3 and 1.7 for 1.5 g/m3).
 
@@ -893,11 +897,3 @@ abcd <- cowplot::plot_grid(rrs, rrd, ab, ab2)
 abcd
 # cowplot::save_plot("figs/test-model.png", abcd)
 ```
-
-# Next steps
-
-Get parameters for each site (slope factors, etc.)
-
-Input spectra --> fitted model with site parameters  --> estimate CDOM absorbance
-
-Extract spectra from broader area --> estimate CDOM absorbance
