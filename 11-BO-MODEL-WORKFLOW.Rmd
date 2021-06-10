@@ -13,7 +13,7 @@ editor_options:
 knitr::opts_chunk$set(echo = FALSE, message = FALSE, eval = FALSE)
 ```
 
-```{r}
+```{r, eval = TRUE}
 library(glue)
 library(tidyverse)
 library(readxl)
@@ -76,17 +76,46 @@ $$R_{rs} = \frac{\zeta \cdot r_{rs}(\lambda)}{1 - \Gamma \cdot r_{rs}(\lambda)} 
 
 * $R_{rs}(0-)$ or $r_{rs}$ is remote sensing reflectance just below water surface
 
-Austin 1980 proposed the factor **0.544** for relating radiance just above the surface with radiance just below the surface. 
+The flux contained within a small solid angle spreads out to a larger solid angle so the value of emergent radiance at any angle is approx 55% of the corresponding subsurface radiance (Kutser et al 2001). Austin 1980 proposed the factor **0.544** for relating radiance just above the surface with radiance just below the surface (including an effect for internal reflection). 
+
+Kutser model (for diffuse component of remote sensing reflectance just above water surface): 
+
+$$R_D(\lambda) = 0.544 \times (0.629 \mu_0 + 0.975) \bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) $$
+Or:
+
+$$ r_{rs}(\lambda, 0^-) = (0.629 \mu_0 + 0.975) \bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) $$
+and $$R_{rs}(\lambda, 0^+) = 0.544\times r_{rs}(\lambda, 0^-)$$
 
 Air-sea interface transfer coefficients from Lee et al 1999:
 
 $$R_{rs}(0+) = \frac{0.52 \times R_{rs}(0-)}{1-1.7 \times R_{rs}(0-)}$$
 
-**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface:
+**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface based on Monte Carlo simulations:
 
 $$r_{rs}(\lambda) = \frac{L_u(0^-,\lambda)}{E_d(0^-,\lambda)} = g_1\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) + g_2\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg)^2$$
 $\frac{b_b}{(a + b_b)}$ in Gordon model can be referred to as $u$. 
 
+g1 or *C* (ignoring other terms in the polynomial) depends on solar zenith angle (0.32 for sun at zenith, or 0.33 according to Prieur 1976). Kirk 1984 found *C* to be a function of the cosine of the zenith angle of refracted photons ($\mu_0$)
+
+$$C(\mu_0) = -0.629\mu_0 + 0.975$$
+
+Reflectance *decreases* as the solar altitude increase (solar altitude angle + solar altitude angle = 90&deg;). For sun at zenith ($\theta_{sun} = 0$) this relationship predicts C = 0.346 (Kirk 1994). 
+
+```{r,eval=TRUE}
+data.frame(theta_sun = seq(-pi/2, pi/2, 0.1)) %>%
+  mutate(mu0 = cos(theta_sun)) %>%
+  mutate(theta_sun_deg = theta_sun * 180/pi) %>%
+  mutate(Cmu0 = -0.629 * mu0 + 0.975) %>%
+  ggplot(aes(x = theta_sun_deg, y = Cmu0)) +
+  geom_vline(aes(xintercept = 0), lty = 2) +
+  geom_hline(aes(yintercept = 0.346), lty = 2) +
+  geom_line() +
+  # geom_point() +
+  ylab(expression(C~(mu[0]))) +
+  xlab(expression(theta[sun]~deg)) +
+  ylim(c(0, NA)) +
+  theme_minimal()
+```
 
 
 ```{r}
@@ -112,11 +141,9 @@ my_wavelengths_rs <- my_spectra_pt$wavelength
 range(my_wavelengths_rs)
 ```
 
-* Shape of reflectance spectra could be qualitatively compared to optical water 
-typologies proposed by **Spyrakos et al 2018 L&O**
+* Shape of reflectance spectra could be qualitatively compared to optical water typologies proposed by **Spyrakos et al 2018 L&O**
 
-* Chl retrieval algorithms make use of chl absorption peaks at 442, 665,
-and reflectance peak around 700 nm from min sum of total absorb.
+* Chl retrieval algorithms make use of chl absorption peaks at 442, 665, and reflectance peak around 700 nm from min sum of total absorb.
 
 > TODO: figure out min acceptable wavelengths in Rrs data
 
@@ -134,43 +161,31 @@ Measured reflectance spectra need to be corrected for air-water interface and no
 
 ## Surface factor 
 
-> TODO: investigate using PAR above and below surface
+> TODO: investigate using PAR and uPAR (above and below surface)
 
 $K_d$ is an apparent optical property, diffuse attenuation under water, that depends on viewing/illumination geometry. PAR and uPAR (underwater PAR) comparison could potentially be used to separately estimate $a(\lambda)$ and $b_b(\lambda)$.
 
-Gordon 1989 model: 
+**Gordon 1989 model**: 
 
 $$K_d(\lambda) = \kappa \bigg(\frac{a(\lambda) + b_b(\lambda)}{cos\theta'_{sun}}\bigg)$$
-$\kappa \approx 1.0546$
-$\theta'_{sun}$ is sun zenith angle in water
+* $\kappa \approx 1.0546$
 
-Lee 2005 model: 
+* $\theta'_{sun}$ is sun zenith angle in water
+
+**Lee 2005 model**: 
 
 $$K_d(\lambda) = m_0\cdot a(\lambda) + m_1(1 - m_2 e^{-m_3 \cdot a(\lambda)})(b_b(\lambda))$$
-$m_0 = 1 + 0.005 \cdot \theta_{sun}$ (sun zenith angle in air)
-$m_1 = 4.18$, $m_2 = 0.52$, $m_3 = 10.8$
+* $m_0 = 1 + 0.005 \cdot \theta_{sun}$ (sun zenith angle in air)
 
-## Solar zenith angle
+* $m_1 = 4.18$ 
 
-Eqn. 4.2 describes irradiance reflectance just below water surface,
-function of total absorption, total backscattering, and *C* which
-depends on solar zenith angle. *C* is a function of the cosine of the
-zenith angle of refracted photons ($\mu_0$). 
+* $m_2 = 0.52$
 
-$C(\mu_0) = -0.629\mu_0 + 0.975$
-
-```{r}
-zenith_dir <- "/Volumes/hondula/DATA/zenith-angles"
-zenith_file <- fs::dir_ls(zenith_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
-
-zenith_df <- read_csv(zenith_file)
-my_zenith_pt <- zenith_df %>% filter(my_cellid)
-my_zenith_pt$to_sensor_zenith_angle
-mu0 <- cos(my_zenith_pt$to_sensor_zenith_angle)
-mu0
-```
+* $m_3 = 10.8$
 
 # SUN GLINT REMOVAL
+
+* https://towardsdatascience.com/how-to-implement-sunglint-detection-for-sentinel-2-images-in-python-using-metadata-info-155e683d50
 
 The reflectance value of interest for aquatic purposes is the ratio
 of water leaving radiance to downwelling planar irradiance:
@@ -184,8 +199,6 @@ has not interacted with the water column and needs to be removed.
 $L_u = L_w + L_r$
 
 The remote sensing ratio is $r_{rs} = \frac{L_u(z)}{E_d(z)}$
-
-
 
 Based on idea that residual radiance in NIR (around 700 - 1000 nm) 
 is from glint, because water leaving reflectance from bottom 
@@ -223,6 +236,9 @@ $D = \frac{R(739) + R(860)}{2} - R(760)$
 * The upwelling radiance spectra will increase dramatically due to glint
 when sun is low (zenith angles are beyond 60 degrees). 
 
+* Sun glint can cause false positives in fire detection algorithms for MODIS (Giglio et al 2003). Channels at 0.65, 0.86, 2.1 (1, 2, 7) $\mu$m are used to test for false positives, along with the angle between surface-to-satellite and specular reflection directions and number of adjacent water pixels.  
+
+
 # In situ data 
 
 Overlaps between in situ data and flights are determined in `10-overlaps`
@@ -248,9 +264,10 @@ $b_{b,w} = 0.5 b_w$
 * more absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
 * Pope and Fry 1997 absorption 380-700 nm at 2.5 nm res,
 also with standard deviations
-* Comparison plot (Figure 10) to Buiteveld et al, Tam and Patel, Smith and Baker, and Sogandares and Fry
+* Comparison plot (Figure 10) to Buiteveld et al, Tam and Patel, Smith and Baker 1981, and Sogandares and Fry
 * Buiteveld 1994 (absorption AND scattering 300-800 nm)
 * More absorbance data in Fewell?
+* Kutser et al models use Smith and Baker 1981 absorbance values
 
 * Buiteveld et al 1994 Table 1 has absorption and scattering coefficients at 20 C, also a proposed temperature dependence (A = absorption increment due to temperature) 
 
@@ -365,6 +382,18 @@ $a_{tot}(\lambda) = a_{w}(\lambda) + a_{CDOM}(\lambda) + a_{phy}(\lambda) + a_{N
 
 ## Phytoplankton Absorbance
 
+* chlorophyll a is an indicator of photosynthetic plankton biomass and a proxy for phytoplankton productivity. 
+* quantifying chl a from remote sensing data based on relationship between chl a and the ratio of blue to green radiance
+
+* Randolph et al 2008 used an ASD Fieldspec spectroradiometer along with in vitro pigment concentrations to test for rapid cyanobacteria bloom assessment, strong relationship between chl a and 665 nm band
+* Awad 2014 used Artificial Neural Networks with Hyperion EO-1 (satellite, 400-2500 nm with 10nm resolution, 30m spatial resolution) data for chl a, in sea water coastal Lebanon (mediterranean)
+* Wang et al 2009 looked at chl a in Liaodong bay, China from Hyperion with exponential model between ratio of 681 to 671 nm:
+
+$$ 2 \times e^{36.11 \times \frac{R681}{R671}}$$
+* Gitelson et al 2011 use HICO (90m resolution) for chl a of the Azov sea: 
+
+$$chl~a = 418.88 \times \bigg((R_{684}~^{-1} - R_{700}~^{-1}) \times R_{720} \bigg) + 19.275$$
+
 * Primary and secondary absorption maxima: 442 nm, 665 nm **Bricaud et al 1995**
 * around 625 for phycocyanin (cyanobacteria) and 675 for chl a
 * Peak near 700 nm (from combination of high absorbance of chl a and NIR $a_w$) 
@@ -389,6 +418,11 @@ chla = sum of chl a AND pheophytin (Albert and Mobley 2003)
 specific absorption coefficients from Gege WASI program
 
 ![](figs/astar-phyto-gege.png)
+
+* **Bricaud et al 1995** model (used in Kutser et al models) uses power function of chl concentration to get each wavelength's specific chl absorption coefficient: 
+
+$$ a^*_{ph}(\lambda) = A(\lambda)\cdot C_{chl}^{-B(\lambda)}$$
+A and B coefficients from lab measurements. This model accounts for packaging effect and means specific absorption coefficient decreases with increasing cell size and cell chl concentration. 
 
 > TODO: Use taxonomy info for separate peaks?
 
@@ -502,6 +536,8 @@ approx(x, y, xout = 390:720) %>% as.data.frame()
 
 ## CDOM absorbance
 
+* Kutser et al. 1995, 1997, 1998abcd, Eloheimo et al. 1998, Kallio et al. 1998 have used airborne and ship-board optical remote sensing to look at chl a, phaeophytin-a, DOC, TOC, total phosphorus, SM, turbidity, secchi depth in turbid waters of Baltic Sea and Estonian and Finnish lakes. Overall, hard to generalize across sites and seasons. 
+* Kutser et al 2001 studied 12 Finnish lakes, coincident measurements included absorption spectra 350-850 nm and vertical profiles of the spectral absorption and attenuation coefficients, spectra above water surface, and AISA airborne imaging spec (7nm resolution, 1 x 1.4m spatial resolution)
 * Colored dissolved organic matter, also known as gelbstoff, yellow substance,
 or gilvin. Assumed not to scatter light because pigments are totally dissolved.
 * Defined as what passes through 0.2 $\mu$m filter (traditionally 0.4)
@@ -509,20 +545,16 @@ or gilvin. Assumed not to scatter light because pigments are totally dissolved.
 benzene (common aromatic ring structure in humic matter)
 * tail of those peaks is approximated by: 
 
-eqn 4.1 - absorption coefficient of CDOM
 
-abs[wl] = abs[wlREF] * exp((-SF) * [wl] - [wlREF])
+$$a_{CDOM}(\lambda) = a_{CDOM}(\lambda_0) \times {exp}( -S \times (\lambda - \lambda_{0}))$$
 
-$a_{CDOM}(\lambda) = a_{CDOM}(\lambda_0) \times {exp}( -S \times (\lambda - \lambda_{0}))$
+mean values for $S$ are 0.016-0.017 $nm^{-1}$, sd 0.002 $nm^{-1}$, variation is due to composition. Range 0.008 - 0.042 $nm^{-1}$
 
-mean values for $S$ are 0.016 $nm^{-1}$, sd 0.002 $nm^{-1}$, variation is due to composition. Range 0.008 - 0.042 $nm^{-1}$
 
-$a^*_{CDOM}(\lambda) = exp\left\{ -S \times (\lambda - \lambda_{0})\right\}$
+CDOM concentration (Y) (proxy for DOC) can be expressed in units of absorption 
+at $\lambda_0$, usually around 400 nm. 
 
-So CDOM concentration (Y) (proxy for DOC) expressed in units of absorption 
-at $\lambda_0$
-
-$Y = a_{CDOM}(\lambda_{0})[m^{-1}]$
+$$Y = a_{CDOM}(\lambda_{0})[m^{-1}]$$
 
 * abs: absorption coefficient (m^-1)
 * wl: wavelength (lambda)
@@ -630,13 +662,21 @@ my_spectra %>%
 # abs_cdom$wl382
 ```
 
-## Flourescence
+## Fluorescence
 
 > TODO:
+
+**Phytoplankton fluourescence**
 
 * flourescence emission band for CHL around 681 nm (Gower et al 1999)
 
 Fluorescence by dissolved organic matter influences the blue part of the spectrum, with a centre wavelength ∼ 430 nm, whereas phycoerythrin fluorescence is centred around 585nm, and chlorophyll-a fluorescence at about 685nm.
+
+* Vigneshwaran et al 2015 used hydrolight models. chl fluorescence is in red around 685-720 nm (with high productivity). Suggest that the magnitude and peak position of those wavelengths could indicate phytoplankton concentrations
+
+**CDOM fluorescence**
+
+
 
 ## Suspended matter absorbance
 
@@ -701,6 +741,8 @@ $\eta$ is the Angstrom exponent and related to the particle size distribution
 ## Phytoplankton backscattering
 
 > TODO: model for this?
+
+* **Ahn et al 1992** measured the backscattering properties of 9 phytoplankters in culture for wavelengths 400-850 nm. Also measured absorption. Chl specific backscattering coefficient is very low, so they conclude that living algae have a negligible influence on backscattering in oceanic waters. 
 
 Sometimes included in the scattering and backscattering coefficients for 
 suspended matter
