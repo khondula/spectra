@@ -90,7 +90,7 @@ Air-sea interface transfer coefficients from Lee et al 1999:
 
 $$R_{rs}(0+) = \frac{0.52 \times R_{rs}(0-)}{1-1.7 \times R_{rs}(0-)}$$
 
-**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface based on Monte Carlo simulations:
+**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface based on Monte Carlo simulations. See Lee et al 2002 for some discussion of g1 and g2. Lee et al 2002 discuss getting total absorption. 
 
 $$r_{rs}(\lambda) = \frac{L_u(0^-,\lambda)}{E_d(0^-,\lambda)} = g_1\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) + g_2\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg)^2$$
 $\frac{b_b}{(a + b_b)}$ in Gordon model can be referred to as $u$. 
@@ -158,6 +158,10 @@ See eg. Albert and Mobey 2003 equations
 
 Measured reflectance spectra need to be corrected for air-water interface and normalization of $R^{+}_{rs}$ to zenith illumination and viewing geometry to get **normalized water-leaving reflectance**: $[R_w]_N$
 
+## Atmospheric correction
+
+* NEON uses ATCOR, which is proprietary but relies a lot on the value of the aerosol optical thickness which is based on observations over "dark dense vegetation".
+* Pahlevan et al 2021 review atmospheric correction for Landsat and Sentinel, comparing to validation data sets. Median errors are 20-30% for the best performing processors, which propagates to 25-75% uncertainty in derived chl a and TSS products. 
 
 ## Surface factor 
 
@@ -183,12 +187,15 @@ $$K_d(\lambda) = m_0\cdot a(\lambda) + m_1(1 - m_2 e^{-m_3 \cdot a(\lambda)})(b_
 
 * $m_3 = 10.8$
 
-# SUN GLINT REMOVAL
+# Sunglint
+
+* Review of methods in **Kay et al 2009**
+* In general, methods for high resolution images make no assumptions about the angle of the water surface and instead use image-based information with the assumption of no NIR water leaving radiance
+* Potential for more statistical based approaches (neural networks) for high res applications
 
 * https://towardsdatascience.com/how-to-implement-sunglint-detection-for-sentinel-2-images-in-python-using-metadata-info-155e683d50
 
-The reflectance value of interest for aquatic purposes is the ratio
-of water leaving radiance to downwelling planar irradiance:
+The reflectance value of interest for aquatic purposes is the ratio of water leaving radiance to downwelling planar irradiance:
 
 $R_{rs} = \frac{L_w(0^+)}{E_d(0^+)}$
 
@@ -384,15 +391,19 @@ $a_{tot}(\lambda) = a_{w}(\lambda) + a_{CDOM}(\lambda) + a_{phy}(\lambda) + a_{N
 
 * chlorophyll a is an indicator of photosynthetic plankton biomass and a proxy for phytoplankton productivity. 
 * quantifying chl a from remote sensing data based on relationship between chl a and the ratio of blue to green radiance
+* the location of the reflectance peak in 700-720 region shifts to longer wavelengths with increasing concentration of phytoplankton. Sentinel 2 has a peak at 705, can be compared to 665-740 baseline as an indicator of chl a (**magnitude of peak**)
 
-* Randolph et al 2008 used an ASD Fieldspec spectroradiometer along with in vitro pigment concentrations to test for rapid cyanobacteria bloom assessment, strong relationship between chl a and 665 nm band
-* Awad 2014 used Artificial Neural Networks with Hyperion EO-1 (satellite, 400-2500 nm with 10nm resolution, 30m spatial resolution) data for chl a, in sea water coastal Lebanon (mediterranean)
-* Wang et al 2009 looked at chl a in Liaodong bay, China from Hyperion with exponential model between ratio of 681 to 671 nm:
+* **Pulliainen et al 2001** used airborne AISA and in situ data from 11 lakes in southern Finland to get chl a, 4 measurement campaigns, 450-900 nm with up to 288 channels, 1m spatial resolution. 
+* **Randolph et al 2008** used an ASD Fieldspec spectroradiometer along with in vitro pigment concentrations to test for rapid cyanobacteria bloom assessment, strong relationship between chl a and 665 nm band
+* **Wang et al 2009** looked at chl a in Liaodong bay, China from Hyperion with exponential model between ratio of 681 to 671 nm:
 
 $$ 2 \times e^{36.11 \times \frac{R681}{R671}}$$
 * Gitelson et al 2011 use HICO (90m resolution) for chl a of the Azov sea: 
 
 $$chl~a = 418.88 \times \bigg((R_{684}~^{-1} - R_{700}~^{-1}) \times R_{720} \bigg) + 19.275$$
+
+* **Awad 2014** used Artificial Neural Networks with Hyperion EO-1 (satellite, 400-2500 nm with 10nm resolution, 30m spatial resolution) data for chl a, in sea water coastal Lebanon (Mediterranean)
+* **Toming et al 2016** tested band ratios on Sentinel data. Well-established algorithms for chl a concentration include: height of reflectance peak between 700 and 720
 
 * Primary and secondary absorption maxima: 442 nm, 665 nm **Bricaud et al 1995**
 * around 625 for phycocyanin (cyanobacteria) and 675 for chl a
@@ -424,12 +435,14 @@ specific absorption coefficients from Gege WASI program
 $$ a^*_{ph}(\lambda) = A(\lambda)\cdot C_{chl}^{-B(\lambda)}$$
 A and B coefficients from lab measurements. This model accounts for packaging effect and means specific absorption coefficient decreases with increasing cell size and cell chl concentration. 
 
+> TODO: Correlations for band ratios
+
 > TODO: Use taxonomy info for separate peaks?
 
-* diatoms - Aguirre-Gomez et al 2001 describe molar proportion of pigments
+* diatoms - **Aguirre-Gomez et al 2001** describe molar proportion of pigments
 as: (1/2)(3 Chla + 1 Chlc) + fucoxanthin + beta-carotene
 
-* green algae - Aguirre-Gomez et al 2001 describe molar proportion of pigments
+* green algae - **Aguirre-Gomez et al 2001** describe molar proportion of pigments
 from Kork 1983 3:1 chla to chlb, 1:3 carotenoids to chla+b:
 (3)(1.6 chla + 1 chlb) + beta-carotene
 
@@ -538,6 +551,15 @@ approx(x, y, xout = 390:720) %>% as.data.frame()
 
 * Kutser et al. 1995, 1997, 1998abcd, Eloheimo et al. 1998, Kallio et al. 1998 have used airborne and ship-board optical remote sensing to look at chl a, phaeophytin-a, DOC, TOC, total phosphorus, SM, turbidity, secchi depth in turbid waters of Baltic Sea and Estonian and Finnish lakes. Overall, hard to generalize across sites and seasons. 
 * Kutser et al 2001 studied 12 Finnish lakes, coincident measurements included absorption spectra 350-850 nm and vertical profiles of the spectral absorption and attenuation coefficients, spectra above water surface, and AISA airborne imaging spec (7nm resolution, 1 x 1.4m spatial resolution)
+* 20m resolution AVIRIS (400-2500 nm, 224 bands) collected over Pantanal in August 1995. **Galvao et al 2003** got field spectra (400-900) of 39 sites across 7 freshwater and 5 saltwater lakes
+* **Toming et al 2016** found a good correlation with band ratio algorithms from Sentinel 2 data for 23 sampling points across 9 small and 2 large lakes in Estonia, sampled in August 2015. best performance for CDOM is usually green to red band ratios
+* **Kutser et al 2015** showed that iron bound to carbon molecules can absorb light in similar way to CDOM. carbon to iron ratio (and ratio of colored to uncolored DOC) complicate observations of optical effects, actually could make it easier to predict lake DOC than CDOM
+
+CDOM concentration is calculated as: 
+
+$$C_{CDOM} = \frac{c^*_f(\lambda)}{exp(-S(\lambda - \lambda_0))\cdot a^*_{CDOM}(\lambda_0)}$$
+* $c^*_f(\lambda)$ is spectrometric reading at ref wavelength (380)
+
 * Colored dissolved organic matter, also known as gelbstoff, yellow substance,
 or gilvin. Assumed not to scatter light because pigments are totally dissolved.
 * Defined as what passes through 0.2 $\mu$m filter (traditionally 0.4)
@@ -664,11 +686,15 @@ my_spectra %>%
 
 ## Fluorescence
 
+* Bukata et al 2004 discuss impacts of inelastic processes
+
 > TODO:
 
 **Phytoplankton fluourescence**
 
-* flourescence emission band for CHL around 681 nm (Gower et al 1999)
+* **Culver and Perry 1997** discuss calculations; chl a fluorescence can account for 10-40% upwelled irradiance at surface and 80% in subsurface
+
+* flourescence emission band for CHL around 681 nm (Gower et al 1999), 680-710
 
 Fluorescence by dissolved organic matter influences the blue part of the spectrum, with a centre wavelength ∼ 430 nm, whereas phycoerythrin fluorescence is centred around 585nm, and chlorophyll-a fluorescence at about 685nm.
 
@@ -752,6 +778,11 @@ chla_df <- aos_df %>% filter(analyteid == "chla")
 ```
 
 ## Suspended matter backscattering
+
+* Beck et al 2019 tested 37 algorithms and 321 variants for turbidity
+* Gordon et al 2009 show power law variation with wavelength, exponent between 0.4 and 1
+
+$$b_b \approx \lambda^{-n}$$
 
 All suspended matter or separate phytoplankton and detritus?
 
