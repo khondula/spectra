@@ -151,7 +151,7 @@ hs_extent <- function(filename){
   xmax <- xmin + dims[2] * xy_resolution[1]
   ymax <- as.numeric(map_info[5])
   ymin <- ymax - dims[3] * xy_resolution[2]
-  raster::extent(xmin, xmax, ymin, ymax)
+  terra::ext(xmin, xmax, ymin, ymax)
 }
 
 
@@ -225,10 +225,10 @@ read_hs_values <- function(filename, index){
   reflectance <- file_h5[[paste0(site, '/Reflectance/Reflectance_Data')]]
   
   arrays <- lapply(bands, function(x) {
-    terra::rast(t(reflectance$read(args = list(x, index[[2]], index[[3]]))))
+    terra::rast(reflectance$read(args = list(x, index[[2]], index[[3]])))
   })
-  
-  arrays_clean <- purrr::map(arrays, ~hs_clean(.x, reflectance))
+  arrays_t <- purrr::map(arrays, ~t(.x))
+  arrays_clean <- purrr::map(arrays_t, ~hs_clean(.x, reflectance))
   
   r_terra <- terra::rast(arrays_clean)
   names(r_terra) <- hs_wavelength(filename, bands)
@@ -236,7 +236,7 @@ read_hs_values <- function(filename, index){
   my_epsg <- hs_epsg(filename)
   terra::crs(r_terra) <- sf::st_crs(paste0("epsg:" ,my_epsg)) %>% as.character()
   
-  file_h5$close_all()
+  # file_h5$close_all()
   r_terra
 }
 
