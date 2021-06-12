@@ -120,13 +120,30 @@ my_h5_files <- 1:nrow(my_xys) %>%
 message(glue('{length(my_h5_files)} files'))
 print(my_h5_files)
 
+my_h5_files[3]
+
+my_h5 <- hdf5r::H5File$new(my_h5_files[3], mode = "r")
+solar_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/Logs/Solar_Zenith_Angle')
+my_solar_zenith <- my_h5[[solar_zenith_path]]$read() 
+
+epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
+my_epsg <- my_h5[[epsg_path]]$read() %>% as.integer()
+
+# sensor zenith path
+sensor_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_Zenith_Angle')
+my_sensor_zenith <- my_h5[[sensor_zenith_path]]$read() %>% t() %>% terra::rast()
+# replace No data pixels
+my_sensor_zenith[my_sensor_zenith==-9999] <- NA
+
+
 # read in and merge h5 files using hs_read
 if(length(my_h5_files) == 1){
   my_h5 <- neonhs::hs_read(my_h5_files, bands = 1:nbands, crop = my_aq_prj)
   names(my_h5) <- hs_wavelength(my_h5_files, bands = 1:nbands)
 }
+
 if(length(my_h5_files) > 1){
-  my_h5 <- neonhs::hs_read(my_h5_files[1], bands = 1:nbands)
+  my_h5 <- neonhs::hs_read(my_h5_files[3], bands = 1:nbands)
   names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
   my_hs_list <- purrr::map(my_h5_files, ~hs_read(.x, bands = 1:nbands))
   for(i in 2:length(my_h5_files)){
@@ -136,16 +153,25 @@ if(length(my_h5_files) > 1){
   
 }
 
+
 # extract spectra from pixels within the polygon
 my_pt_spatvec <- my_aq_prj %>% as('SpatVector')
 my_pts_spatvec <- my_aq_prj_buff5 %>% as('SpatVector')
 
 my_hs_terra <- my_h5
-my_cellid <- cells(my_hs_terra, my_pt_spatvec)[2]
+my_cellid <- cells(my_hs_terra, my_pt_spatvec)[,2]
+cellid_df <- data.frame(loctype = my_aq_prj$loctype,cellid = my_cellid)
+
+terra::ext(my_sensor_zenith) <- terra::ext(my_hs_terra)
+terra::crs(my_sensor_zenith) <- terra::crs(my_hs_terra)
+names(my_sensor_zenith) <- 'sensorZenith'
+# plot(my_sensor_zenith)
+# plot(my_aq_prj$geometry, add = TRUE, pch = 4, col = 'blue', cex = 1)
+my_hs_terra <- c(my_hs_terra, my_sensor_zenith)
 
 message('extracting pixel values now')
 
-my_spectra <- terra::extract(my_hs_terra, my_pt_spatvec, cells = TRUE)
+my_spectra <- terra::extract(my_hs_terra, my_pts_spatvec, cells = TRUE)
 my_spectra_df <- my_spectra %>% 
   as_tibble() %>%
   mutate(x = terra::xFromCell(my_hs_terra, cell),
@@ -155,11 +181,13 @@ my_spectra_df <- my_spectra %>%
                names_to = 'band', 
                values_to = 'reflectance') %>% 
   tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
-  dplyr::mutate(wavelength = parse_number(wavelength)) %>%
-  dplyr::mutate(my_cellid = cell == my_cellid)
+  dplyr::mutate(wavelength = parse_number(wavelength))
+
+my_spectra_df <- my_spectra_df %>% 
+  left_join(cellid_df, by = c("cell" = "cellid")) %>%
+  mutate(solar_zenith = my_solar_zenith)
 
 ncells <- unique(my_spectra_df$cell) %>% length()
-
 message(glue('{ncells} cells in your polygons'))
 
 # mysamp <- sample(unique(my_spectra_df$cell), size = 100)
@@ -180,37 +208,35 @@ message(glue('{ncells} cells in your polygons'))
 my_spectra_df %>% 
   vroom::vroom_write(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}.tsv'))
 
-bands_to_plot <- seq(1, 100, length.out = 12)
+# bands_to_plot <- seq(1, 100, length.out = 12)
 # bands_to_plot <- 65:100
 # my_h5 <- hs_read(my_h5_files, bands = bands_to_plot)
 # names(my_h5) <- hs_wavelength(my_h5_files, bands = bands_to_plot)
 
-my_aq_prj_buff <- st_buffer(my_aq_prj, 0)
-my_h5_bands <- terra::subset(my_h5, subset = bands_to_plot)
-my_hs_crop <- terra::crop(my_h5_bands, my_aq_prj_buff)
-# my_hs_crop <- raster::crop(my_h5_bands, my_aq_prj)
-hs_crop_stars <- my_hs_crop %>% st_as_stars()
+# my_aq_prj_buff <- st_buffer(my_aq_prj, 50)
+# my_hs_crop <- terra::crop(my_hs_terra, my_aq_prj_buff)
+# hs_crop_stars <- my_hs_crop %>% st_as_stars()
 
 # test_raster <- hs_crop_stars %>% as("Raster")
 # library(leaflet)
 # library(mapview)
 # mapview(test_raster)
 
-gg <- ggplot() +
-  geom_stars(data = hs_crop_stars) +
-  coord_equal() +
-  facet_wrap(~band) +
-  geom_sf(data = my_aq_prj, fill = NA, col = 'white') +
-  theme_void() + 
-  theme(legend.title = element_blank()) +
-  scale_fill_scico(palette = 'romaO') +
-  # scale_fill_scico(palette = 'davos') +
-  ggtitle(glue('{my_aq_site} {my_aop_yr}'))
+# gg <- ggplot() +
+#   geom_stars(data = hs_crop_stars) +
+#   coord_equal() +
+#   facet_wrap(~band) +
+#   geom_sf(data = my_aq_prj, fill = NA, col = 'white') +
+#   theme_void() + 
+#   theme(legend.title = element_blank()) +
+#   scale_fill_scico(palette = 'romaO') +
+#   # scale_fill_scico(palette = 'davos') +
+#   ggtitle(glue('{my_aq_site} {my_aop_yr}'))
 # gg
 # ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}-glint.pdf'), plot = gg, width = 10, height = 8)
 
 # ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}_firstbands.pdf'), plot = gg, width = 10, height = 8)
-ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}.pdf'), plot = gg, width = 10, height = 8)
+# ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}.pdf'), plot = gg, width = 10, height = 8)
 
 }
 
