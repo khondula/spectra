@@ -17,14 +17,37 @@ my_aq_polygon <- 'BARC_AOSpts'
 my_aq_polygon <- 'SUGG_AOSpts'
 my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
 
-my_aop_yr <- '2014'
+my_aop_yr <- '2019'
 
-my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
-my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
 
+# SUGG
+my_aq_polygon <- 'SUGG_AOSpts'
+# my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
+# my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
+my_flightlines <- get_flightline_ids('OSBS', '2016', 'BARC_AOSpts') # No kmls? 
+my_flightlines <- get_flightline_ids('OSBS', '2016', 'SUGG_AOSpts') # No kmls? 
+# my_flightlines <- get_flightline_ids('OSBS', '2017', 'BARC_AOSpts')
+# my_flightlines <- get_flightline_ids('OSBS', '2017', 'SUGG_AOSpts')  
+# my_flightlines <- get_flightline_ids('OSBS', '2018', 'BARC_AOSpts')  
+# my_flightlines <- get_flightline_ids('OSBS', '2018', 'SUGG_AOSpts')  
+my_flightlines <- get_flightline_ids('OSBS', '2019', 'BARC_AOSpts') # none? 
+my_flightlines <- get_flightline_ids('OSBS', '2019', 'SUGG_AOSpts')
+
+wood_years <- c('2016', '2017', '2019', '2020')
+my_flightlines_prpo <- purrr::map(wood_years, ~get_flightline_ids('WOOD', .x , 'PRPO_AOSpts'))
+names(my_flightlines_prpo) <- wood_years
+my_flightlines_prla <- purrr::map(wood_years, ~get_flightline_ids('WOOD', .x , 'PRLA_AOSpts'))
+names(my_flightlines_prla) <- wood_years
+
+my_flightlines
+
+my_aop_site <- 'OSBS'
+my_aop_yr <- '2016'
+my_aq_polygon <- 'SUGG_AOSpts'
+  
 get_flightline_ids <- function(my_aop_site, 
                                my_aop_yr, 
-                               my_water_sf,
+                               my_aq_polygon,
                                kmls_base_dir = '/Volumes/hondula/DATA/AOP/ReflectanceL1',
                                keep_kmls = FALSE){
   
@@ -59,7 +82,7 @@ my_site_aop_df <- my_site_aop_df %>%
 my_site_urls <- my_site_aop_df %>% pull(url)
 
 # get URL
-my_url <- my_site_urls[1]
+# my_url <- my_site_urls[1]
 
 # find the KML file that overlaps the points of interest
 # check out the RGB reflectance - GLINT? 
@@ -94,6 +117,7 @@ n_kmls <- length(my_files$urls)
 message(glue('downloading {n_kmls} kmls from {my_aop_site} {my_aop_yr}'))
 # download_month <- function(my_files){
 my_kmls_local <- glue('{kmls_dir}/{my_files$files}')
+# TODO: check for files already downloaded
 purrr::walk2(.x = my_files$urls, .y = my_kmls_local, ~download.file(.x, .y))
 # }
 n_kmls_local <- length(fs::dir_ls(kmls_dir))
@@ -101,6 +125,8 @@ message(glue('downloaded {n_kmls_local} kmls from {my_aop_site} {my_aop_yr}'))
 
 
 # NOW find which kmls overlap aos_pts locations
+my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
+# my_kml_file <- my_kmls_local[1]
 test_in_kml <- function(my_kml_file, my_water_sf){
   kml1 <- st_read(my_kml_file) %>%
     st_zm() %>% filter(st_is(geometry, c("POLYGON", "MULTIPOLYGON"))) %>%
@@ -124,45 +150,45 @@ return(my_flightlines)
 
 ## Once you know which flightlines (from kmz)
 
-get_pattern_files <- function(my_url, myglob = 'reflectance.h5'){
-  data_files_req <- GET(my_url)
-  data_files <- content(data_files_req, as = "text") %>%
-    fromJSON(simplifyDataFrame = TRUE, flatten = TRUE)
-  data_files_df <- data_files$data$files %>% 
-    filter(str_detect(name, glue('{myglob}'))) 
-  # future enhancement: check md5 sums for changes! 
-  return_list <- NULL
-  if(nrow(data_files_df) > 0){
-    return_list <- list(files = data_files_df$name, urls = data_files_df$url)}
-  return(return_list)
-}
-
-my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'reflectance.h5'))
-
-my_h5s_df <- my_files_list[[1]] %>% 
-  as.data.frame() %>% 
-  mutate(flightline = str_sub(files, 19, 33)) %>%
-  dplyr::filter(flightline %in% my_flightlines)
-# first flightline
-# my_h5_file_id <- my_files_list[[1]]$files %>% 
-#   purrr::map_lgl(~str_detect(.x, my_flightlines)) %>% which()
-# my_h5_file <- my_files_list[[4]]$files[my_h5_file_id]
-# my_h5_url <- my_files_list[[4]]$urls[my_h5_file_id]
-
-h5_local_dir <- '/Volumes/hondula/DATA/AOP/ReflectanceL1'
-my_files_local <- fs::dir_ls(h5_local_dir, recurse = TRUE, regexp = my_h5_file)
-my_files_local <- glue('{kmls_dir}/{my_h5_file}')
-## works up until here
-getOption('timeout')
-options(timeout=1200)
-# approx 5 GB
-library(curl)
-curl_download(url = my_h5_url, destfile = my_files_local)
-# download.file(url = my_h5_url, destfile = my_files_local)
-# purrr::walk2(.x = my_files$urls, .y = my_files_local, ~download.file(.x, .y))
-
-my_h5_file_local <- my_files_local
-
-neonhs::hs_epsg(my_h5_file_local)
-my_h5 <- hdf5r::H5File$new(my_h5_file_local, mode = "r")
-hdf5r::h5close(my_h5)
+# get_pattern_files <- function(my_url, myglob = 'reflectance.h5'){
+#   data_files_req <- GET(my_url)
+#   data_files <- content(data_files_req, as = "text") %>%
+#     fromJSON(simplifyDataFrame = TRUE, flatten = TRUE)
+#   data_files_df <- data_files$data$files %>% 
+#     filter(str_detect(name, glue('{myglob}'))) 
+#   # future enhancement: check md5 sums for changes! 
+#   return_list <- NULL
+#   if(nrow(data_files_df) > 0){
+#     return_list <- list(files = data_files_df$name, urls = data_files_df$url)}
+#   return(return_list)
+# }
+# 
+# my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'reflectance.h5'))
+# 
+# my_h5s_df <- my_files_list[[1]] %>% 
+#   as.data.frame() %>% 
+#   mutate(flightline = str_sub(files, 19, 33)) %>%
+#   dplyr::filter(flightline %in% my_flightlines)
+# # first flightline
+# # my_h5_file_id <- my_files_list[[1]]$files %>% 
+# #   purrr::map_lgl(~str_detect(.x, my_flightlines)) %>% which()
+# # my_h5_file <- my_files_list[[4]]$files[my_h5_file_id]
+# # my_h5_url <- my_files_list[[4]]$urls[my_h5_file_id]
+# 
+# h5_local_dir <- '/Volumes/hondula/DATA/AOP/ReflectanceL1'
+# my_files_local <- fs::dir_ls(h5_local_dir, recurse = TRUE, regexp = my_h5_file)
+# my_files_local <- glue('{kmls_dir}/{my_h5_file}')
+# ## works up until here
+# getOption('timeout')
+# options(timeout=1200)
+# # approx 5 GB
+# library(curl)
+# curl_download(url = my_h5_url, destfile = my_files_local)
+# # download.file(url = my_h5_url, destfile = my_files_local)
+# # purrr::walk2(.x = my_files$urls, .y = my_files_local, ~download.file(.x, .y))
+# 
+# my_h5_file_local <- my_files_local
+# 
+# neonhs::hs_epsg(my_h5_file_local)
+# my_h5 <- hdf5r::H5File$new(my_h5_file_local, mode = "r")
+# hdf5r::h5close(my_h5)
