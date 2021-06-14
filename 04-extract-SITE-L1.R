@@ -1,26 +1,27 @@
 # extract spectra from pixels within a polygon
 # devtools::install_github('khondula/neonhs', force = TRUE)
-library(neonhs)
-library(viridis)
-library(raster)
+
+# library(neonhs)
+# library(viridis)
+# library(raster)
 library(hdf5r)
 library(sf)
 library(tidyverse)
 library(glue)
-library(terra)
-library(stars)
-library(scico)
-library(vroom)
-source('R/myfxns.R')
+# library(terra)
+# library(stars)
+# library(scico)
+# library(vroom)
+# source('R/myfxns.R')
 
 # set up
-spectra_dir <- 'H:/DATA/spectra_site/'
+# spectra_dir <- 'H:/DATA/spectra_site/'
 
 # fs::dir_ls('H:/DATA/AOP/site-polygons')
 
 # my_water_sf <- st_read('H:/DATA/AOP/site-polygons/PRLA_2016.shp')
 
-nbands <- 426
+nbands <- 10
 my_aq_site <- 'BARC'
 my_aop_yr <- '2017'
 my_aop_site <- 'OSBS'
@@ -37,13 +38,13 @@ my_aq_polygon <- 'BARC_AOSpts'
 # save_spectra('PRPO', '2020', 'WOOD', 'PRPO_2016', 'D09', 100)
 
 #
-save_spectra('CRAM', '2019', 'UNDE', 'CRAM_2015', 'D05', 100)
-save_spectra('TOOK', '2018', 'TOOL', 'TOOK_2016', 'D18', 100)
-save_spectra('FLNT', '2017', 'JERC', 'FLNT_2017', 'D03', 100)
-save_spectra('FLNT', '2018', 'JERC', 'FLNT_2017', 'D03', 100)
-save_spectra('FLNT', '2019', 'JERC', 'FLNT_2017', 'D03', 100)
-save_spectra('BLWA', '2019', 'DELA', 'BLWA_2019', 'D08', 100)
-save_spectra('TOMB', '2018', 'LENO', 'TOMB_2017_100m', 'D08', 100)
+# save_spectra('CRAM', '2019', 'UNDE', 'CRAM_2015', 'D05', 100)
+# save_spectra('TOOK', '2018', 'TOOL', 'TOOK_2016', 'D18', 100)
+# save_spectra('FLNT', '2017', 'JERC', 'FLNT_2017', 'D03', 100)
+# save_spectra('FLNT', '2018', 'JERC', 'FLNT_2017', 'D03', 100)
+# save_spectra('FLNT', '2019', 'JERC', 'FLNT_2017', 'D03', 100)
+# save_spectra('BLWA', '2019', 'DELA', 'BLWA_2019', 'D08', 100)
+# save_spectra('TOMB', '2018', 'LENO', 'TOMB_2017_100m', 'D08', 100)
 
 
 # save_spectra('BARC', '2018', 'OSBS', 'BARC_2018', 'D03', 100)
@@ -61,7 +62,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   
   spectra_dir <- 'H:/DATA/L1-refl-spectra/'
   
-# folder with AOP data
+  # folder with AOP data
   my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
     fs::dir_ls(glob = glue("*{my_aop_site}*"), type = 'directory')
   my_site_files <- glue('{my_site_dir}/L1/Spectrometer/ReflectanceH5') %>%
@@ -72,10 +73,10 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
   epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
   my_epsg <- my_h5[[epsg_path]]$read() %>% as.integer()
-  hdf5r::h5close(my_h5)
   
-  # wls_path <- glue('{my_aop_site}/Reflectance/Metadata/Spectral_Data/Wavelength')
-  # my_wls <- my_h5[[wls_path]]$read()
+  wls_path <- glue('{my_aop_site}/Reflectance/Metadata/Spectral_Data/Wavelength')
+  my_wls <- my_h5[[wls_path]]$read()
+  hdf5r::h5close(my_h5)
   
   # project polygon to AOP data
   my_aq_prj <- my_water_sf %>% st_transform(crs = my_epsg)
@@ -85,7 +86,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
     st_bbox() %>% st_as_sfc() %>% 
     st_as_sf() %>% st_cast(to = "POINT")
   my_xys <- sf::st_coordinates(bbox_pts_sf) %>% 
-    as.data.frame() %>% distinct()
+    as.data.frame() %>% dplyr::distinct()
 
 # find the images that span the bbox of buffered points
 # need to use map info not filenames
@@ -94,12 +95,13 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
     rename(fullname = 1) %>%
     mutate(filename = basename(fullname))
 
-  extent_list <- my_site_files %>% purrr::map(~hs_extent(.x))
+  extent_list <- my_site_files %>% 
+    purrr::map(~neonhs::hs_extent(.x))
   my_site_files_df <- my_site_files_df %>% 
-    dplyr::mutate(xmin = purrr::map_dbl(extent_list, ~.x@xmin),
-             xmax = purrr::map_dbl(extent_list, ~.x@xmax),
-             ymin = purrr::map_dbl(extent_list, ~.x@ymin),
-             ymax = purrr::map_dbl(extent_list, ~.x@ymax))
+    dplyr::mutate(xmin = purrr::map_dbl(extent_list, ~.x[1]),
+             xmax = purrr::map_dbl(extent_list, ~.x[2]),
+             ymin = purrr::map_dbl(extent_list, ~.x[3]),
+             ymax = purrr::map_dbl(extent_list, ~.x[4]))
              
   
 find_which_file <- function(my_id){
@@ -120,7 +122,7 @@ my_h5_files <- 1:nrow(my_xys) %>%
 message(glue('{length(my_h5_files)} files'))
 print(my_h5_files)
 
-my_h5_files[3]
+# my_h5_files[3]
 
 my_h5 <- hdf5r::H5File$new(my_h5_files[3], mode = "r")
 solar_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/Logs/Solar_Zenith_Angle')
@@ -143,7 +145,7 @@ if(length(my_h5_files) == 1){
 }
 
 if(length(my_h5_files) > 1){
-  my_h5 <- neonhs::hs_read(my_h5_files[3], bands = 1:nbands)
+  my_h5 <- neonhs::hs_read(my_h5_files[1], bands = 1:nbands)
   names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
   my_hs_list <- purrr::map(my_h5_files, ~hs_read(.x, bands = 1:nbands))
   for(i in 2:length(my_h5_files)){
@@ -243,4 +245,3 @@ my_spectra_df %>%
 #
 #
 
-# STREAMS
