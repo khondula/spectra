@@ -1,14 +1,36 @@
-l1_refl_id <- 'DP1.30006.001'
+## function to search KMLs for flightlines overlapping points
+
 library(tidyverse)
 library(fs)
 library(glue)
 library(httr)
 library(tidyverse)
 library(jsonlite)
-my_site <- 'OSBS'
+library(sf)
 
+# set up
+l1_refl_id <- 'DP1.30006.001'
+my_aq_site <- 'BARC'
+my_aop_site <- 'OSBS'
+my_domain <- 'D03'
+my_aq_polygon <- 'BARC_AOSpts'
+my_aq_polygon <- 'SUGG_AOSpts'
+my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
+
+my_aop_yr <- '2014'
+
+my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
+my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
+
+get_flightline_ids <- function(my_aop_site, 
+                               my_aop_yr, 
+                               my_water_sf,
+                               kmls_base_dir = '/Volumes/hondula/DATA/AOP/ReflectanceL1',
+                               keep_kmls = FALSE){
+  
 base_url <- 'http://data.neonscience.org/api/v0/'
-data_id <- 'DP1.30006.001' # l1 refl
+l1_refl_id <- 'DP1.30006.001'
+data_id <- l1_refl_id # l1 refl DP1.30006.001
 req_avail <- GET(glue('{base_url}/products/{data_id}'))
 avail_resp <- content(req_avail, as = 'text') %>% 
   fromJSON(simplifyDataFrame = TRUE, flatten = TRUE)
@@ -21,28 +43,34 @@ avail_df <- data_urls_list %>%
   dplyr::rename(url = 1) %>%
   mutate(siteid = str_sub(url, 56, 59)) %>%
   mutate(month = str_sub(url, 61, 67)) %>%
-  dplyr::select(siteid, month, url)
+  dplyr::select(siteid, month, url) %>% 
+  mutate(aop_yr = str_sub(month, 1, 4))
 
-my_site_to_get <- avail_df %>% 
-  dplyr::filter(siteid == my_site) %>%
-  dplyr::filter(as.numeric(substr(month, 1, 4)) > 2011)
+my_site_aop_df <- avail_df %>% 
+  dplyr::filter(siteid == my_aop_site)
 
-my_site_urls <- my_site_to_get %>% pull(url)
+# my_site_aop_df$month
+# my_site_aop_df$aop_yr
 
-# filter to just the waq_instantaneous basic files
-my_url <- my_site_urls[4]
+# filter to year of interest 
+my_site_aop_df <- my_site_aop_df %>% 
+  dplyr::filter(aop_yr %in% my_aop_yr)
+
+my_site_urls <- my_site_aop_df %>% pull(url)
+
+# get URL
+my_url <- my_site_urls[1]
 
 # find the KML file that overlaps the points of interest
 # check out the RGB reflectance - GLINT? 
 # 
-myglob = 'kml'
+
 get_pattern_files <- function(my_url, myglob = 'kml'){
   data_files_req <- GET(my_url)
   data_files <- content(data_files_req, as = "text") %>%
     fromJSON(simplifyDataFrame = TRUE, flatten = TRUE)
   data_files_df <- data_files$data$files %>% 
     filter(str_detect(name, glue('{myglob}')))
-  # filter(str_detect(name, "(kml).*(kml)"))
   # future enhancement: check md5 sums for changes! 
   return_list <- NULL
   if(nrow(data_files_df) > 0){
@@ -52,31 +80,30 @@ get_pattern_files <- function(my_url, myglob = 'kml'){
 
 my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'kml'))
 
-new_files <- my_files_list %>% map_lgl(~!is.null(.x))
-any_new <- any(new_files)
-if(!any_new){message(glue('No new {myglob} data from {mysite}'))}
-months_newfiles <- my_site_to_get[['month']][which(new_files)]
+# notnull_files_list <- my_files_list %>% map_lgl(~!is.null(.x))
+# any_new <- any(notnull_files_list)
+# if(!any_new){message(glue('No {myglob} data from {my_aq_site}'))}
+# months_newfiles <- my_site_to_get[['month']][which(new_files)]
 
-my_files_list[4]
+my_files <- my_files_list[[1]]
+kmls_dir <- glue('{kmls_base_dir}/{my_aop_yr}/{my_aop_site}/kmls')
+fs::dir_create(kmls_dir)
+# my_files <- my_files_list[[4]]
 
-kmls_dir <- '/Volumes/hondula/DATA/AOP/test-l1'
-my_files <- my_files_list[[4]]
+n_kmls <- length(my_files$urls)
+message(glue('downloading {n_kmls} kmls from {my_aop_site} {my_aop_yr}'))
+# download_month <- function(my_files){
+my_kmls_local <- glue('{kmls_dir}/{my_files$files}')
+purrr::walk2(.x = my_files$urls, .y = my_kmls_local, ~download.file(.x, .y))
+# }
+n_kmls_local <- length(fs::dir_ls(kmls_dir))
+message(glue('downloaded {n_kmls_local} kmls from {my_aop_site} {my_aop_yr}'))
 
-download_month <- function(my_files){
-  my_files_local <- glue('{kmls_dir}/{my_files$files}')
-  purrr::walk2(.x = my_files$urls, .y = my_files_local, ~download.file(.x, .y))
-}
-library(sf)
 
-# find which kmls overlap aos_pts locations
-my_aq_polygon <- 'BARC_AOSpts'
-my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
-my_kml_file <- '/Volumes/hondula/DATA/AOP/test-l1/20170927_170305_hsi_kml_0000.kml'
-my_kml_file <- my_files_local[43]
+# NOW find which kmls overlap aos_pts locations
 test_in_kml <- function(my_kml_file, my_water_sf){
   kml1 <- st_read(my_kml_file) %>%
-    st_zm() %>%
-    filter(st_is(geometry, c("POLYGON", "MULTIPOLYGON"))) %>%
+    st_zm() %>% filter(st_is(geometry, c("POLYGON", "MULTIPOLYGON"))) %>%
     st_make_valid()
   my_aq_prj <- my_water_sf %>% st_transform(st_crs(kml1)) # use EPSG for dell
   my_mat <- st_intersects(my_water_sf, kml1, sparse = FALSE)
@@ -85,21 +112,15 @@ test_in_kml <- function(my_kml_file, my_water_sf){
 }
 
 safe_test_in_kml <- possibly(test_in_kml, otherwise = FALSE)
-safe_test_in_kml(my_files_local[1], my_water_sf)
-safe_test_in_kml(my_kml_file, my_water_sf)
-
-kml_tests <- my_files_local %>% purrr::map_lgl(~safe_test_in_kml(.x, my_water_sf))
-# kml_tests <- my_files_local %>% purrr::map_lgl(~safe_test_in_kml(.x, my_water_sf))
-# kml_tests %>% purrr::map(~.x$result) %>% flatten_lgl()
-kml_tests
-my_kmls <- my_files_local[which(kml_tests)]
+kml_tests <- my_kmls_local %>% purrr::map_lgl(~safe_test_in_kml(.x, my_water_sf))
+my_kmls <- my_kmls_local[which(kml_tests)]
 
 my_flightlines <- my_kmls %>% basename() %>% str_sub(1, 15)
+if(!keep_kmls){fs::file_delete(my_kmls_local)}
+return(my_flightlines)
+}
 
 
-ggplot() +
-  geom_sf(data = kml1) +
-  geom_sf(data = my_water_sf)
 
 ## Once you know which flightlines (from kmz)
 
@@ -109,7 +130,6 @@ get_pattern_files <- function(my_url, myglob = 'reflectance.h5'){
     fromJSON(simplifyDataFrame = TRUE, flatten = TRUE)
   data_files_df <- data_files$data$files %>% 
     filter(str_detect(name, glue('{myglob}'))) 
-  # filter(str_detect(name, "(kml).*(kml)"))
   # future enhancement: check md5 sums for changes! 
   return_list <- NULL
   if(nrow(data_files_df) > 0){
@@ -118,11 +138,16 @@ get_pattern_files <- function(my_url, myglob = 'reflectance.h5'){
 }
 
 my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'reflectance.h5'))
-my_files_list[[4]] %>% str()
+
+my_h5s_df <- my_files_list[[1]] %>% 
+  as.data.frame() %>% 
+  mutate(flightline = str_sub(files, 19, 33)) %>%
+  dplyr::filter(flightline %in% my_flightlines)
 # first flightline
-my_h5_file_id <- my_files_list[[4]]$files %>% purrr::map_lgl(~str_detect(.x, my_flightlines[2])) %>% which()
-my_h5_file <- my_files_list[[4]]$files[my_h5_file_id]
-my_h5_url <- my_files_list[[4]]$urls[my_h5_file_id]
+# my_h5_file_id <- my_files_list[[1]]$files %>% 
+#   purrr::map_lgl(~str_detect(.x, my_flightlines)) %>% which()
+# my_h5_file <- my_files_list[[4]]$files[my_h5_file_id]
+# my_h5_url <- my_files_list[[4]]$urls[my_h5_file_id]
 
 h5_local_dir <- '/Volumes/hondula/DATA/AOP/ReflectanceL1'
 my_files_local <- fs::dir_ls(h5_local_dir, recurse = TRUE, regexp = my_h5_file)
