@@ -120,16 +120,24 @@ get_pattern_files <- function(my_url, myglob = 'reflectance.h5'){
 my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'reflectance.h5'))
 my_files_list[[4]] %>% str()
 # first flightline
-my_h5_file_id <- my_files_list[[4]]$files %>% purrr::map_lgl(~str_detect(.x, my_flightlines[1])) %>% which()
+my_h5_file_id <- my_files_list[[4]]$files %>% purrr::map_lgl(~str_detect(.x, my_flightlines[2])) %>% which()
 my_h5_file <- my_files_list[[4]]$files[my_h5_file_id]
 my_h5_url <- my_files_list[[4]]$urls[my_h5_file_id]
 
+h5_local_dir <- '/Volumes/hondula/DATA/AOP/ReflectanceL1'
+my_files_local <- fs::dir_ls(h5_local_dir, recurse = TRUE, regexp = my_h5_file)
 my_files_local <- glue('{kmls_dir}/{my_h5_file}')
 ## works up until here
-download.file(url = my_h5_url, destfile = my_files_local)
+getOption('timeout')
+options(timeout=1200)
+# approx 5 GB
+library(curl)
+curl_download(url = my_h5_url, destfile = my_files_local)
+# download.file(url = my_h5_url, destfile = my_files_local)
 # purrr::walk2(.x = my_files$urls, .y = my_files_local, ~download.file(.x, .y))
 
 my_h5_file_local <- my_files_local
 
-# neonhs::hs_epsg(my_h5_file_local)
-# my_h5 <- hdf5r::H5File$new(my_h5_file_local, mode = "r")
+neonhs::hs_epsg(my_h5_file_local)
+my_h5 <- hdf5r::H5File$new(my_h5_file_local, mode = "r")
+hdf5r::h5close(my_h5)
