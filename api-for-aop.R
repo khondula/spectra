@@ -39,14 +39,30 @@ names(my_flightlines_prpo) <- wood_years
 my_flightlines_prla <- purrr::map(wood_years, ~get_flightline_ids('WOOD', .x , 'PRLA_AOSpts'))
 names(my_flightlines_prla) <- wood_years
 
+cram_years <- c('2016', '2017', '2019', '2020')
+my_flightlines_cram <- purrr::map(cram_years, ~get_flightline_ids('UNDE', .x , 'CRAM_AOSpts'))
+names(my_flightlines_cram) <- cram_years
+
+liro_years <- c('2017', '2020')
+my_flightlines_liro <- purrr::map(liro_years, ~get_flightline_ids('LIRO', .x , 'LIRO_AOSpts'))
+names(my_flightlines_liro) <- liro_years
+
+took_years <- c('2017', '2018', '2019')
+my_flightlines_took <- purrr::map(took_years, ~get_flightline_ids('TOOL', .x , 'TOOK_AOSpts'))
+names(my_flightlines_took) <- took_years
+
 my_flightlines
 
-my_aop_site <- 'OSBS'
-my_aop_yr <- '2016'
-my_aq_polygon <- 'SUGG_AOSpts'
+test_kml_file <- '/Volumes/hondula/DATA/AOP/test-l1/20170927_144501_hsi_kml_0000.kml'
+my_xml <- test_kml_file %>% xml2::read_xml() %>% xml2::as_list()
+my_colorcode <- unlist(my_xml$kml$Document$Folder$Placemark$Style$LineStyle$color)
+
+my_aop_site <- 'JERC'
+my_aop_yr <- '2017'
+my_aq_polygon <- 'FLNT_AOSpts'
   
 get_flightline_ids <- function(my_aop_site, 
-                               my_aop_yr, 
+                               # my_aop_yr, 
                                my_aq_polygon,
                                kmls_base_dir = '/Volumes/hondula/DATA/AOP/ReflectanceL1',
                                keep_kmls = FALSE){
@@ -69,15 +85,15 @@ avail_df <- data_urls_list %>%
   dplyr::select(siteid, month, url) %>% 
   mutate(aop_yr = str_sub(month, 1, 4))
 
-my_site_aop_df <- avail_df %>% 
-  dplyr::filter(siteid == my_aop_site)
+  my_site_aop_df <- avail_df %>% 
+    dplyr::filter(siteid == my_aop_site)
 
 # my_site_aop_df$month
 # my_site_aop_df$aop_yr
 
 # filter to year of interest 
-my_site_aop_df <- my_site_aop_df %>% 
-  dplyr::filter(aop_yr %in% my_aop_yr)
+# my_site_aop_df <- my_site_aop_df %>% 
+#   dplyr::filter(aop_yr %in% my_aop_yr)
 
 my_site_urls <- my_site_aop_df %>% pull(url)
 
@@ -85,8 +101,6 @@ my_site_urls <- my_site_aop_df %>% pull(url)
 # my_url <- my_site_urls[1]
 
 # find the KML file that overlaps the points of interest
-# check out the RGB reflectance - GLINT? 
-# 
 
 get_pattern_files <- function(my_url, myglob = 'kml'){
   data_files_req <- GET(my_url)
@@ -102,13 +116,8 @@ get_pattern_files <- function(my_url, myglob = 'kml'){
 }
 
 my_files_list <- my_site_urls %>% purrr::map(~get_pattern_files(.x, 'kml'))
-
-# notnull_files_list <- my_files_list %>% map_lgl(~!is.null(.x))
-# any_new <- any(notnull_files_list)
-# if(!any_new){message(glue('No {myglob} data from {my_aq_site}'))}
-# months_newfiles <- my_site_to_get[['month']][which(new_files)]
-
-my_files <- my_files_list[[1]]
+my_files <- my_files_list %>% map(~as.data.frame(.x)) %>% bind_rows()
+# my_files <- my_files_list[[1]]
 kmls_dir <- glue('{kmls_base_dir}/{my_aop_yr}/{my_aop_site}/kmls')
 fs::dir_create(kmls_dir)
 # my_files <- my_files_list[[4]]
@@ -141,7 +150,24 @@ safe_test_in_kml <- possibly(test_in_kml, otherwise = FALSE)
 kml_tests <- my_kmls_local %>% purrr::map_lgl(~safe_test_in_kml(.x, my_water_sf))
 my_kmls <- my_kmls_local[which(kml_tests)]
 
+# get weather info from kmls of interest
+get_kml_colorcode <- function(kml_file){
+  my_xml <- kml_file %>% xml2::read_xml() %>% xml2::as_list()
+  my_colorcode <- unlist(my_xml$kml$Document$Folder$Placemark$Style$LineStyle$color)
+  return(my_colorcode)
+}
+
+my_colorcodes <- my_kmls %>% purrr::map_chr(~get_kml_colorcode(.x))
+
+# put data frame together
 my_flightlines <- my_kmls %>% basename() %>% str_sub(1, 15)
+kml_cols <- read_csv('kml-colors.csv')
+data.frame(aop_site = my_aop_site,
+           shp = my_aq_polygon,
+           flightlines = my_flightlines,
+           kml_color = my_colorcodes) %>%
+  left_join(kml_cols)
+
 if(!keep_kmls){fs::file_delete(my_kmls_local)}
 return(my_flightlines)
 }
