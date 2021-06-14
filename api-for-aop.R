@@ -14,53 +14,20 @@ my_aq_site <- 'BARC'
 my_aop_site <- 'OSBS'
 my_domain <- 'D03'
 my_aq_polygon <- 'BARC_AOSpts'
-my_aq_polygon <- 'SUGG_AOSpts'
 my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
 
-my_aop_yr <- '2019'
+get_flightline_ids('BLUE', 'BLUE_AOSpts')
+get_flightline_ids('DELA', 'BLWA_AOSpts')
+get_flightline_ids('LENO', 'TOMB_AOSpts')
+get_flightline_ids('JERC', 'FLNT_AOSpts')
+get_flightline_ids('LIRO', 'LIRO_AOSpts')
+get_flightline_ids('OSBS', 'SUGG_AOSpts')
+get_flightline_ids('OSBS', 'BARC_AOSpts')
+get_flightline_ids('WOOD', 'PRPO_AOSpts')
+get_flightline_ids('WOOD', 'PRLA_AOSpts')
+get_flightline_ids('UNDE', 'CRAM_AOSpts')
+get_flightline_ids('TOOL', 'TOOK_AOSpts')
 
-
-# SUGG
-my_aq_polygon <- 'SUGG_AOSpts'
-# my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
-# my_flightlines <- get_flightline_ids('OSBS', '2014', my_water_sf)
-my_flightlines <- get_flightline_ids('OSBS', '2016', 'BARC_AOSpts') # No kmls? 
-my_flightlines <- get_flightline_ids('OSBS', '2016', 'SUGG_AOSpts') # No kmls? 
-# my_flightlines <- get_flightline_ids('OSBS', '2017', 'BARC_AOSpts')
-# my_flightlines <- get_flightline_ids('OSBS', '2017', 'SUGG_AOSpts')  
-# my_flightlines <- get_flightline_ids('OSBS', '2018', 'BARC_AOSpts')  
-# my_flightlines <- get_flightline_ids('OSBS', '2018', 'SUGG_AOSpts')  
-my_flightlines <- get_flightline_ids('OSBS', '2019', 'BARC_AOSpts') # none? 
-my_flightlines <- get_flightline_ids('OSBS', '2019', 'SUGG_AOSpts')
-
-wood_years <- c('2016', '2017', '2019', '2020')
-my_flightlines_prpo <- purrr::map(wood_years, ~get_flightline_ids('WOOD', .x , 'PRPO_AOSpts'))
-names(my_flightlines_prpo) <- wood_years
-my_flightlines_prla <- purrr::map(wood_years, ~get_flightline_ids('WOOD', .x , 'PRLA_AOSpts'))
-names(my_flightlines_prla) <- wood_years
-
-cram_years <- c('2016', '2017', '2019', '2020')
-my_flightlines_cram <- purrr::map(cram_years, ~get_flightline_ids('UNDE', .x , 'CRAM_AOSpts'))
-names(my_flightlines_cram) <- cram_years
-
-liro_years <- c('2017', '2020')
-my_flightlines_liro <- purrr::map(liro_years, ~get_flightline_ids('LIRO', .x , 'LIRO_AOSpts'))
-names(my_flightlines_liro) <- liro_years
-
-took_years <- c('2017', '2018', '2019')
-my_flightlines_took <- purrr::map(took_years, ~get_flightline_ids('TOOL', .x , 'TOOK_AOSpts'))
-names(my_flightlines_took) <- took_years
-
-my_flightlines
-
-test_kml_file <- '/Volumes/hondula/DATA/AOP/test-l1/20170927_144501_hsi_kml_0000.kml'
-my_xml <- test_kml_file %>% xml2::read_xml() %>% xml2::as_list()
-my_colorcode <- unlist(my_xml$kml$Document$Folder$Placemark$Style$LineStyle$color)
-
-my_aop_site <- 'JERC'
-my_aop_yr <- '2017'
-my_aq_polygon <- 'FLNT_AOSpts'
-  
 get_flightline_ids <- function(my_aop_site, 
                                # my_aop_yr, 
                                my_aq_polygon,
@@ -162,14 +129,15 @@ my_colorcodes <- my_kmls %>% purrr::map_chr(~get_kml_colorcode(.x))
 # put data frame together
 my_flightlines <- my_kmls %>% basename() %>% str_sub(1, 15)
 kml_cols <- read_csv('kml-colors.csv')
-data.frame(aop_site = my_aop_site,
+
+my_flightlines_df <- data.frame(aop_site = my_aop_site,
            shp = my_aq_polygon,
            flightlines = my_flightlines,
            kml_color = my_colorcodes) %>%
   left_join(kml_cols)
-
 if(!keep_kmls){fs::file_delete(my_kmls_local)}
-return(my_flightlines)
+write_csv(my_flightlines_df, glue('results/l1-flightlines/{my_aop_site}-{my_aq_polygon}-flightlines.csv'))
+return(my_flightlines_df)
 }
 
 
