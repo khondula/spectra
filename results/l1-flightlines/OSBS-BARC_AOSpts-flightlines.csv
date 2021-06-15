@@ -1,0 +1,7 @@
+aop_site,shp,flightlines,kml_color,color,condition
+OSBS,BARC_AOSpts,20140507_152342,ff00ff00,green,good
+OSBS,BARC_AOSpts,20140520_155830,ff00ffff,yellow,okay
+OSBS,BARC_AOSpts,20140520_155014,ff00ffff,yellow,okay
+OSBS,BARC_AOSpts,20170927_170305,ff0000ff,red,bad
+OSBS,BARC_AOSpts,20181012_172548,ff00ff00,green,good
+OSBS,BARC_AOSpts,20180915_154327,ff0000ff,red,bad

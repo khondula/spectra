@@ -1,0 +1,15 @@
+aop_site,shp,flightlines,kml_color,color,condition
+OSBS,SUGG_AOSpts,20140507_154018,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20140520_152515,ff00ffff,yellow,okay
+OSBS,SUGG_AOSpts,20140520_162436,ff0000ff,red,bad
+OSBS,SUGG_AOSpts,20140520_153408,ff00ffff,yellow,okay
+OSBS,SUGG_AOSpts,20140520_145919,ff00ffff,yellow,okay
+OSBS,SUGG_AOSpts,20140507_140657,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20140507_154756,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20170927_171031,ff0000ff,red,bad
+OSBS,SUGG_AOSpts,20170927_163135,ff0000ff,red,bad
+OSBS,SUGG_AOSpts,20170927_171735,ff0000ff,red,bad
+OSBS,SUGG_AOSpts,20181005_134947,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20181012_174055,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20181012_174934,ff00ff00,green,good
+OSBS,SUGG_AOSpts,20180915_155817,ff0000ff,red,bad
