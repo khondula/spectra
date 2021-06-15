@@ -62,11 +62,9 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
          aop_yr = str_sub(flightlines, 1, 4)) %>%
   left_join(aq_sites, by = c('aq_site' = 'siteID'))
 
-# issues with
-# 3, 4, 5, 6, 7, 8
-flightlines_df[3:8,]
-
-19:83 %>% 
+# flightlines_df %>% arrange(shp, flightlines) %>% write_csv('results/l1-flightlines-wDomain.csv')
+  
+1:83 %>% 
   purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
                             flightlines_df$aop_yr[.x], 
                             flightlines_df$aop_site[.x], 
