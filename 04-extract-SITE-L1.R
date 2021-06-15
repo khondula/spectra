@@ -62,8 +62,11 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
          aop_yr = str_sub(flightlines, 1, 4)) %>%
   left_join(aq_sites, by = c('aq_site' = 'siteID'))
 
+# issues with
+# 3, 4, 5, 6, 7, 8
+flightlines_df[3:8,]
 
-1:nrow(flightlines_df) %>% 
+19:83 %>% 
   purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
                             flightlines_df$aop_yr[.x], 
                             flightlines_df$aop_site[.x], 
@@ -128,7 +131,6 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
                          crs = my_epsg2,
                          extent = my_extent)
   
-  # hdf5r::h5close(my_h5)
   # convert points to h5 projection
   my_aq_prj <- my_water_sf %>% sf::st_transform(my_epsg2) # use EPSG for dell?
   my_pts_spatvec <- my_aq_prj %>% as('SpatVector')
@@ -186,7 +188,10 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   cellinfo_path <- glue('{data_dir}/L1-reflectance/meta/{my_aq_site}_{flightline}.tsv')
   spectra_df %>% vroom::vroom_write(spectra_path)
   cellinfo_df %>% vroom::vroom_write(cellinfo_path)
-
+  
+  message(glue('saved spectra for {nrow(cellinfo_df)} pts at {my_aq_site} from {flightline}'))
+  hdf5r::h5close(my_h5)
+  
 }
 
 #
