@@ -89,6 +89,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_water_sf <- sf::st_read(polygon_file)
   spectra_out_dir <- glue::glue('{data_dir}/L1-refl-spectra')
   
+  # check for duplicate named points in shp file... add new identifier?
+  
   # get h5 file for flightline
   my_site_dir <- glue::glue('{data_dir}/AOP/ReflectanceL1/{my_aop_yr}/{my_aop_site}')
   my_h5_file <- fs::dir_ls(my_site_dir, glob = glue::glue('*{flightline}*.h5'))
@@ -146,6 +148,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
                   celly = my_cell_xys[,2]) %>%
     dplyr::filter(!is.nan(cellid))
   
+  # should first check whether pixels are in NA region of raster!! 
+  # otherwise getting lots of -9999s for no reason
   # get spectra 
   my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[1:426, cellinfo_df[['cellrow']][.x], cellinfo_df[['cellcol']][.x]])
   names(my_spectra_list) <- cellinfo_df[['loctype']]
@@ -154,6 +158,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
     as.data.frame() %>% 
     mutate(wl = my_wls) %>%
     mutate(band = glue('band_{str_pad(1:426, 3, "left", "0")}'))
+  
+  # divide by scale factor and take out no data value here??
   
   # spectra_df %>% 
   #   dplyr::select(-band) %>%
