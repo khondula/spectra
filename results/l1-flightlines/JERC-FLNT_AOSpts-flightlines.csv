@@ -1,0 +1,8 @@
+aop_site,shp,flightlines,kml_color,color,condition
+JERC,FLNT_AOSpts,20170917_174613,ff00ffff,yellow,okay
+JERC,FLNT_AOSpts,20170917_144900,ff00ff00,green,good
+JERC,FLNT_AOSpts,20170918_165616,ff00ff00,green,good
+JERC,FLNT_AOSpts,20180919_153133,ff00ff00,green,good
+JERC,FLNT_AOSpts,20180916_155910,ff00ff00,green,good
+JERC,FLNT_AOSpts,20190830_182242,ff0000ff,red,bad
+JERC,FLNT_AOSpts,20190906_144357,ff00ff00,green,good
