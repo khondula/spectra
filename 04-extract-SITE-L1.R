@@ -6,7 +6,7 @@
 # library(raster)
 library(hdf5r)
 library(sf)
-library(tidyverse)
+# library(tidyverse)
 library(glue)
 # library(terra)
 # library(stars)
@@ -20,13 +20,6 @@ library(glue)
 # fs::dir_ls('H:/DATA/AOP/site-polygons')
 
 # my_water_sf <- st_read('H:/DATA/AOP/site-polygons/PRLA_2016.shp')
-
-nbands <- 10
-my_aq_site <- 'BARC'
-my_aop_yr <- '2017'
-my_aop_site <- 'OSBS'
-my_domain <- 'D03'
-my_aq_polygon <- 'BARC_AOSpts'
 
 # maybe working
 # save_spectra('PRLA', '2017', 'WOOD', 'PRLA_2016', 'D09', 100)
@@ -53,192 +46,146 @@ my_aq_polygon <- 'BARC_AOSpts'
 # save_spectra('SUGG', '2018', 'OSBS', 'SUGG_2018', 'D03', 100)
 # save_spectra('SUGG', '2019', 'OSBS', 'SUGG_2018', 'D03', 100)
 
+data_dir <- '/Volumes/hondula/DATA'
+my_aq_site <- 'OSBS'
+my_aop_yr <- '2014'
+my_aop_site <- 'OSBS'
+my_aq_polygon <- 'SUGG_AOSpts'
+my_domain <- 'D03'
+flightline <- '20140507_140657'
+
+aq_sites <- read_csv('../neon-sites/results/swchem_sites_df.csv') %>%
+  dplyr::select(domainID, siteID) %>% distinct()
+
+flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
+  mutate(aq_site = str_sub(shp, 1, 4), 
+         aop_yr = str_sub(flightlines, 1, 4)) %>%
+  left_join(aq_sites, by = c('aq_site' = 'siteID'))
+
+
+1:nrow(flightlines_df) %>% 
+  purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
+                            flightlines_df$aop_yr[.x], 
+                            flightlines_df$aop_site[.x], 
+                            flightlines_df$shp[.x], 
+                            flightlines_df$domainID[.x], 
+                            flightlines_df$flightlines[.x]))
+
+# save_spectra(flightlines_df$aq_site[1], 
+#              flightlines_df$aop_yr[1], 
+#              flightlines_df$aop_site[1], 
+#              flightlines_df$shp[1], 
+#              flightlines_df$domainID[1], 
+#              flightlines_df$flightlines[1])
+
+# save_spectra('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03', '20140507_152342')
+
+
 save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
-                         my_aq_polygon,
-                         my_domain, nbands){
-
+                         my_aq_polygon, my_domain, flightline){
   
-  my_water_sf <- st_read(glue('H:/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
+  polygon_file <- glue::glue('{data_dir}/AOP/site-polygons/{my_aq_polygon}.shp')
+  my_water_sf <- sf::st_read(polygon_file)
+  spectra_out_dir <- glue::glue('{data_dir}/L1-refl-spectra')
   
-  spectra_dir <- 'H:/DATA/L1-refl-spectra/'
+  # get h5 file for flightline
+  my_site_dir <- glue::glue('{data_dir}/AOP/ReflectanceL1/{my_aop_yr}/{my_aop_site}')
+  my_h5_file <- fs::dir_ls(my_site_dir, glob = glue::glue('*{flightline}*.h5'))
   
-  # folder with AOP data
-  my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
-    fs::dir_ls(glob = glue("*{my_aop_site}*"), type = 'directory')
-  my_site_files <- glue('{my_site_dir}/L1/Spectrometer/ReflectanceH5') %>%
-    fs::dir_ls(glob = '*.h5', recurse = TRUE)
-
-  # get the projection info from the first file
-  my_h5_file <- my_site_files[1]
+  # file metadata
   my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
   epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
-  my_epsg <- my_h5[[epsg_path]]$read() %>% as.integer()
+  my_epsg <- my_h5[[epsg_path]]$read()
+  
+  solar_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/Logs/Solar_Zenith_Angle')
+  my_solar_zenith <- my_h5[[solar_zenith_path]]$read() 
   
   wls_path <- glue('{my_aop_site}/Reflectance/Metadata/Spectral_Data/Wavelength')
   my_wls <- my_h5[[wls_path]]$read()
-  hdf5r::h5close(my_h5)
   
-  # project polygon to AOP data
-  my_aq_prj <- my_water_sf %>% st_transform(crs = my_epsg)
-  my_aq_prj_buff5 <- st_buffer(my_aq_prj, 5)
-  # get corners of extent
-  bbox_pts_sf <- my_aq_prj_buff5 %>% 
-    st_bbox() %>% st_as_sfc() %>% 
-    st_as_sf() %>% st_cast(to = "POINT")
-  my_xys <- sf::st_coordinates(bbox_pts_sf) %>% 
-    as.data.frame() %>% dplyr::distinct()
+  # reflectance and metadata
+  my_refl <- my_h5[[glue('{my_aop_site}/Reflectance/Reflectance_Data')]]
+  scale_factor <- my_refl$attr_open('Scale_Factor')$read()
+  na_value <- my_refl$attr_open('Data_Ignore_Value')$read()
+  cloud_conditions <- my_refl$attr_open('Cloud conditions')$read()
+  
+  # extent
+  
+  map_info_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/Map_Info')
+  map_info <- my_h5[[map_info_path]]$read() %>% strsplit(',') %>% unlist()
+  my_dims <- my_refl$dims
+  xy_resolution <- as.numeric(c(map_info[2], map_info[3]))
+  xmin <- as.numeric(map_info[4])
+  xmax <- xmin + my_dims[2] * xy_resolution[1]
+  ymax <- as.numeric(map_info[5])
+  ymin <- ymax - my_dims[3] * xy_resolution[2]
+  my_extent <- terra::ext(xmin, xmax, ymin, ymax)
+  
+  # blank raster with map info
+  my_epsg2 <- glue('EPSG:{my_epsg}')
+  my_rast <- terra::rast(nrow = my_dims[2],
+                         ncol = my_dims[3],
+                         crs = my_epsg2,
+                         extent = my_extent)
+  
+  # hdf5r::h5close(my_h5)
+  # convert points to h5 projection
+  my_aq_prj <- my_water_sf %>% sf::st_transform(my_epsg2) # use EPSG for dell?
+  my_pts_spatvec <- my_aq_prj %>% as('SpatVector')
+  
+  # get spatial location of pts in raster dimensions
+  my_cellids <- terra::cells(my_rast, my_pts_spatvec)[,2] # modify this for polygons
+  my_cellrowcols <- terra::rowColFromCell(my_rast, my_cellids)
+  my_cell_xys <- terra::xyFromCell(my_rast, my_cellids)
 
-# find the images that span the bbox of buffered points
-# need to use map info not filenames
-  my_site_files_df <- my_site_files %>%
+  cellinfo_df <- my_aq_prj %>% st_drop_geometry() %>%
+    dplyr::mutate(cellid = my_cellids,
+                  cellrow = my_cellrowcols[,1],
+                  cellcol = my_cellrowcols[,2],
+                  cellx = my_cell_xys[, 1],
+                  celly = my_cell_xys[,2]) %>%
+    dplyr::filter(!is.nan(cellid))
+  
+  # get spectra 
+  my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[1:426, cellinfo_df[['cellrow']][.x], cellinfo_df[['cellcol']][.x]])
+  names(my_spectra_list) <- cellinfo_df[['loctype']]
+  
+  spectra_df <- my_spectra_list %>% 
     as.data.frame() %>% 
-    rename(fullname = 1) %>%
-    mutate(filename = basename(fullname))
-
-  extent_list <- my_site_files %>% 
-    purrr::map(~neonhs::hs_extent(.x))
-  my_site_files_df <- my_site_files_df %>% 
-    dplyr::mutate(xmin = purrr::map_dbl(extent_list, ~.x[1]),
-             xmax = purrr::map_dbl(extent_list, ~.x[2]),
-             ymin = purrr::map_dbl(extent_list, ~.x[3]),
-             ymax = purrr::map_dbl(extent_list, ~.x[4]))
-             
+    mutate(wl = my_wls) %>%
+    mutate(band = glue('band_{str_pad(1:426, 3, "left", "0")}'))
   
-find_which_file <- function(my_id){
-  my_x <- my_xys[['X']][my_id]
-  my_y <- my_xys[['Y']][my_id]
-  my_h5_file <- my_site_files_df %>%
-    mutate(x_in_range = {{ my_x }} >= xmin & {{ my_x }} <= xmax,
-           y_in_range = {{ my_y }} >= ymin & {{ my_y }} <= ymax) %>%
-    dplyr::filter(x_in_range, y_in_range) %>% 
-    pull(fullname) %>% unique()
-  return(my_h5_file)
-}
+  # spectra_df %>% 
+  #   dplyr::select(-band) %>%
+  #   tidyr::pivot_longer(cols = -wl, names_to = 'loctype') %>%
+  #   ggplot(aes(x = wl, y = value/scale_factor)) +
+  #   geom_line(aes(col = loctype)) +
+  #   geom_point(aes(fill = loctype), alpha = 0.5, pch = 21) +
+  #   xlim(c(NA, 750)) + ylim(c(0, 0.2)) +
+  #   theme_bw() + 
+  #   ggtitle(glue('{my_aq_site} {my_aop_yr}\n {flightline}, {cloud_conditions}'))
+  # get pixel metadata - sensor angles
 
-my_h5_files <- 1:nrow(my_xys) %>% 
-  purrr::map(~find_which_file(.x)) %>% 
-  unlist() %>% unique()
-
-message(glue('{length(my_h5_files)} files'))
-print(my_h5_files)
-
-# my_h5_files[3]
-
-my_h5 <- hdf5r::H5File$new(my_h5_files[3], mode = "r")
-solar_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/Logs/Solar_Zenith_Angle')
-my_solar_zenith <- my_h5[[solar_zenith_path]]$read() 
-
-epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
-my_epsg <- my_h5[[epsg_path]]$read() %>% as.integer()
-
-# sensor zenith path
-sensor_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_Zenith_Angle')
-my_sensor_zenith <- my_h5[[sensor_zenith_path]]$read() %>% t() %>% terra::rast()
-# replace No data pixels
-my_sensor_zenith[my_sensor_zenith==-9999] <- NA
-
-
-# read in and merge h5 files using hs_read
-if(length(my_h5_files) == 1){
-  my_h5 <- neonhs::hs_read(my_h5_files, bands = 1:nbands, crop = my_aq_prj)
-  names(my_h5) <- hs_wavelength(my_h5_files, bands = 1:nbands)
-}
-
-if(length(my_h5_files) > 1){
-  my_h5 <- neonhs::hs_read(my_h5_files[1], bands = 1:nbands)
-  names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
-  my_hs_list <- purrr::map(my_h5_files, ~hs_read(.x, bands = 1:nbands))
-  for(i in 2:length(my_h5_files)){
-    my_h5 <- merge(my_h5, my_hs_list[[i]])
-  }
-  names(my_h5) <- hs_wavelength(my_h5_files[1], bands = 1:nbands)
+  # sensor zenith path
+  sensor_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_Zenith_Angle')
+  # same as reflectance
+  my_sensor_zenith <- my_h5[[sensor_zenith_path]]
+  my_sensor_zenith_list <- purrr::map(1:nrow(cellinfo_df), ~my_sensor_zenith[cellinfo_df[['cellrow']][.x], cellinfo_df[['cellcol']][.x]])
+  names(my_sensor_zenith_list) <- cellinfo_df[['loctype']]
   
-}
+  cellinfo_df <- cellinfo_df %>%
+    mutate(sensor_zenith = unlist(my_sensor_zenith_list),
+           solar_zenith = my_solar_zenith,
+           clouds = cloud_conditions,
+           flightline = flightline,
+           aop_site = my_aop_site,
+           crs = my_epsg2)
 
 
-# extract spectra from pixels within the polygon
-my_pt_spatvec <- my_aq_prj %>% as('SpatVector')
-my_pts_spatvec <- my_aq_prj_buff5 %>% as('SpatVector')
-
-my_hs_terra <- my_h5
-my_cellid <- cells(my_hs_terra, my_pt_spatvec)[,2]
-cellid_df <- data.frame(loctype = my_aq_prj$loctype,cellid = my_cellid)
-
-terra::ext(my_sensor_zenith) <- terra::ext(my_hs_terra)
-terra::crs(my_sensor_zenith) <- terra::crs(my_hs_terra)
-names(my_sensor_zenith) <- 'sensorZenith'
-# plot(my_sensor_zenith)
-# plot(my_aq_prj$geometry, add = TRUE, pch = 4, col = 'blue', cex = 1)
-my_hs_terra <- c(my_hs_terra, my_sensor_zenith)
-
-message('extracting pixel values now')
-
-my_spectra <- terra::extract(my_hs_terra, my_pts_spatvec, cells = TRUE)
-my_spectra_df <- my_spectra %>% 
-  as_tibble() %>%
-  mutate(x = terra::xFromCell(my_hs_terra, cell),
-         y = terra::yFromCell(my_hs_terra, cell)) %>%
-  group_by(cell) %>%
-  pivot_longer(cols = starts_with('band'), 
-               names_to = 'band', 
-               values_to = 'reflectance') %>% 
-  tidyr::separate(band, into = c('index', 'wavelength'), sep = "_") %>%
-  dplyr::mutate(wavelength = parse_number(wavelength))
-
-my_spectra_df <- my_spectra_df %>% 
-  left_join(cellid_df, by = c("cell" = "cellid")) %>%
-  mutate(solar_zenith = my_solar_zenith)
-
-ncells <- unique(my_spectra_df$cell) %>% length()
-message(glue('{ncells} cells in your polygons'))
-
-# mysamp <- sample(unique(my_spectra_df$cell), size = 100)
-# 
-# my_spectra_df %>%
-#   dplyr::filter(cell %in% mysamp) %>%
-#   # dplyr::filter(cell == 442414) %>%
-#   ggplot(aes(wavelength, reflectance)) +
-#   geom_line(aes(group = cell)) +
-#   theme_bw() +
-#   coord_cartesian(ylim = c(0, 0.2)) +
-#   theme(legend.position = 'none') +
-#   ggtitle(glue('{my_aq_site}-{my_aop_yr}'))
-
-# ggsave(glue('figs/buff5m-spectra/{my_aq_site}-{my_aop_yr}-5mbuff-{str_replace_all(my_loc_type, "[:punct:]", "")}.png'))
-
-
-my_spectra_df %>% 
-  vroom::vroom_write(glue('{spectra_dir}/{my_aq_site}_{my_aop_yr}.tsv'))
-
-# bands_to_plot <- seq(1, 100, length.out = 12)
-# bands_to_plot <- 65:100
-# my_h5 <- hs_read(my_h5_files, bands = bands_to_plot)
-# names(my_h5) <- hs_wavelength(my_h5_files, bands = bands_to_plot)
-
-# my_aq_prj_buff <- st_buffer(my_aq_prj, 50)
-# my_hs_crop <- terra::crop(my_hs_terra, my_aq_prj_buff)
-# hs_crop_stars <- my_hs_crop %>% st_as_stars()
-
-# test_raster <- hs_crop_stars %>% as("Raster")
-# library(leaflet)
-# library(mapview)
-# mapview(test_raster)
-
-# gg <- ggplot() +
-#   geom_stars(data = hs_crop_stars) +
-#   coord_equal() +
-#   facet_wrap(~band) +
-#   geom_sf(data = my_aq_prj, fill = NA, col = 'white') +
-#   theme_void() + 
-#   theme(legend.title = element_blank()) +
-#   scale_fill_scico(palette = 'romaO') +
-#   # scale_fill_scico(palette = 'davos') +
-#   ggtitle(glue('{my_aq_site} {my_aop_yr}'))
-# gg
-# ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}-glint.pdf'), plot = gg, width = 10, height = 8)
-
-# ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}_firstbands.pdf'), plot = gg, width = 10, height = 8)
-# ggsave(glue('figs/site-maps/{my_aq_site}_{my_aop_yr}.pdf'), plot = gg, width = 10, height = 8)
+  spectra_path <- glue('{data_dir}/L1-reflectance/spectra/{my_aq_site}_{flightline}.tsv')
+  cellinfo_path <- glue('{data_dir}/L1-reflectance/meta/{my_aq_site}_{flightline}.tsv')
+  spectra_df %>% vroom::vroom_write(spectra_path)
+  cellinfo_df %>% vroom::vroom_write(cellinfo_path)
 
 }
 
