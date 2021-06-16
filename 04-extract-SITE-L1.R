@@ -37,10 +37,11 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
          aop_yr = str_sub(flightlines, 1, 4)) %>%
   left_join(aq_sites, by = c('aq_site' = 'siteID'))
 
-flightlines_df <- read_csv('results/l1-flightlines-wDomain.csv')
+flightlines_df <- read_csv('results/l1-flightlines-wDomain.csv') %>%
+  dplyr::filter(!(flightlines == '20190606_192344' & aop_site == 'UNDE'))
 # flightlines_df %>% arrange(shp, flightlines) %>% write_csv('results/l1-flightlines-wDomain.csv')
   
-1:83 %>% purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
+22:83 %>% purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
                             flightlines_df$aop_yr[.x], 
                             flightlines_df$aop_site[.x], 
                             flightlines_df$shp[.x], 
