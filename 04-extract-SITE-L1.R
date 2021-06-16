@@ -37,10 +37,10 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
          aop_yr = str_sub(flightlines, 1, 4)) %>%
   left_join(aq_sites, by = c('aq_site' = 'siteID'))
 
+flightlines_df <- read_csv('results/l1-flightlines-wDomain.csv')
 # flightlines_df %>% arrange(shp, flightlines) %>% write_csv('results/l1-flightlines-wDomain.csv')
   
-1:83 %>% 
-  purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
+1:83 %>% purrr::walk(~save_spectra(flightlines_df$aq_site[.x], 
                             flightlines_df$aop_yr[.x], 
                             flightlines_df$aop_site[.x], 
                             flightlines_df$shp[.x], 
@@ -60,12 +60,15 @@ save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_161319') # 
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162051') # no cells
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162804') # no cells
 
-my_aq_site <- 'SUGG'
+my_aq_site <- 'BARC'
 my_aop_yr <- '2014'
 my_aop_site <- 'OSBS'
-my_aq_polygon <- 'SUGG_AOSpts'
+my_aq_polygon <- 'BARC_AOSpts'
 my_domain <- 'D03'
-flightline <- '20140507_154756'
+flightline <- '20140507_152342'
+
+save_spectra('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03', '20140507_152342')
+save_spectra('TOMB', '2017', 'LENO', 'TOMB_AOSpts', 'D08', '20170517_190309')
 
 save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
                          my_aq_polygon, my_domain, flightline){
@@ -112,8 +115,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   
   # blank raster with map info
   my_epsg2 <- glue('EPSG:{my_epsg}')
-  my_rast <- terra::rast(nrow = my_dims[3],
-                         ncol = my_dims[2],
+  my_rast <- terra::rast(ncols = my_dims[2],
+                         nrows = my_dims[3],
                          crs = my_epsg2,
                          extent = my_extent)
   
@@ -126,7 +129,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_cellrowcols <- terra::rowColFromCell(my_rast, my_cellids)
   my_cell_xys <- terra::xyFromCell(my_rast, my_cellids)
 
-  cellinfo_df <- my_aq_prj %>% 
+  cellinfo_df <- my_water_sf %>% 
     st_drop_geometry() %>%
     dplyr::mutate(cellid = my_cellids,
                   cellrow = my_cellrowcols[,1],
@@ -134,6 +137,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
                   cellx = my_cell_xys[, 1],
                   celly = my_cell_xys[,2]) %>%
     dplyr::filter(!is.nan(cellid))
+  
   
   if(nrow(cellinfo_df)<1){stop('cell ids are all NaN')}
   
@@ -165,7 +169,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   sensor_zenith_path <- glue('{my_aop_site}/Reflectance/Metadata/to-sensor_Zenith_Angle')
   # same as reflectance
   my_sensor_zenith <- my_h5[[sensor_zenith_path]]
-  my_sensor_zenith_list <- purrr::map(1:nrow(cellinfo_df), ~my_sensor_zenith[cellinfo_df[['cellrow']][.x], cellinfo_df[['cellcol']][.x]])
+  my_sensor_zenith_list <- purrr::map(1:nrow(cellinfo_df), ~my_sensor_zenith[cellinfo_df[['cellcol']][.x], cellinfo_df[['cellrow']][.x]])
   names(my_sensor_zenith_list) <- cellinfo_df[['loctype']]
   
   cellinfo_df <- cellinfo_df %>%
