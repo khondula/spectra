@@ -55,8 +55,6 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
 #              flightlines_df$flightlines[1])
 
 save_spectra('SUGG', '2014', 'OSBS', 'SUGG_AOSpts', 'D03', '20140507_154756')
-
-
 save_spectra('CRAM', '2019', 'UNDE', 'CRAM_AOSpts', 'D05', '20190606_192344') # no cells?
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_161319') # no cells
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162051') # no cells
@@ -114,8 +112,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   
   # blank raster with map info
   my_epsg2 <- glue('EPSG:{my_epsg}')
-  my_rast <- terra::rast(nrow = my_dims[2],
-                         ncol = my_dims[3],
+  my_rast <- terra::rast(nrow = my_dims[3],
+                         ncol = my_dims[2],
                          crs = my_epsg2,
                          extent = my_extent)
   
@@ -128,7 +126,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_cellrowcols <- terra::rowColFromCell(my_rast, my_cellids)
   my_cell_xys <- terra::xyFromCell(my_rast, my_cellids)
 
-  cellinfo_df <- my_aq_prj %>% st_drop_geometry() %>%
+  cellinfo_df <- my_aq_prj %>% 
+    st_drop_geometry() %>%
     dplyr::mutate(cellid = my_cellids,
                   cellrow = my_cellrowcols[,1],
                   cellcol = my_cellrowcols[,2],
@@ -141,7 +140,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   # should first check whether pixels are in NA region of raster!! 
   # otherwise getting lots of -9999s for no reason
   # get spectra 
-  my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[1:426, cellinfo_df[['cellrow']][.x], cellinfo_df[['cellcol']][.x]])
+  my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[1:426, cellinfo_df[['cellcol']][.x], cellinfo_df[['cellrow']][.x]])
   names(my_spectra_list) <- cellinfo_df[['loctype']]
   
   spectra_df <- my_spectra_list %>% 
