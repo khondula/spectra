@@ -21,31 +21,6 @@ library(glue)
 
 # my_water_sf <- st_read('H:/DATA/AOP/site-polygons/PRLA_2016.shp')
 
-# maybe working
-# save_spectra('PRLA', '2017', 'WOOD', 'PRLA_2016', 'D09', 100)
-# save_spectra('PRLA', '2019', 'WOOD', 'PRLA_2016', 'D09', 100)
-# save_spectra('PRLA', '2020', 'WOOD', 'PRLA_2016', 'D09', 100)
-
-# save_spectra('PRPO', '2017', 'WOOD', 'PRPO_2016', 'D09', 100)
-# save_spectra('PRPO', '2019', 'WOOD', 'PRPO_2016', 'D09', 100)
-# save_spectra('PRPO', '2020', 'WOOD', 'PRPO_2016', 'D09', 100)
-
-#
-# save_spectra('CRAM', '2019', 'UNDE', 'CRAM_2015', 'D05', 100)
-# save_spectra('TOOK', '2018', 'TOOL', 'TOOK_2016', 'D18', 100)
-# save_spectra('FLNT', '2017', 'JERC', 'FLNT_2017', 'D03', 100)
-# save_spectra('FLNT', '2018', 'JERC', 'FLNT_2017', 'D03', 100)
-# save_spectra('FLNT', '2019', 'JERC', 'FLNT_2017', 'D03', 100)
-# save_spectra('BLWA', '2019', 'DELA', 'BLWA_2019', 'D08', 100)
-# save_spectra('TOMB', '2018', 'LENO', 'TOMB_2017_100m', 'D08', 100)
-
-
-# save_spectra('BARC', '2018', 'OSBS', 'BARC_2018', 'D03', 100)
-# save_spectra('BARC', '2019', 'OSBS', 'BARC_2018', 'D03', 100)
-
-# save_spectra('SUGG', '2018', 'OSBS', 'SUGG_2018', 'D03', 100)
-# save_spectra('SUGG', '2019', 'OSBS', 'SUGG_2018', 'D03', 100)
-
 data_dir <- '/Volumes/hondula/DATA'
 my_aq_site <- 'OSBS'
 my_aop_yr <- '2014'
@@ -79,12 +54,25 @@ flightlines_df <- read_csv('results/l1-flightlines.csv') %>%
 #              flightlines_df$domainID[1], 
 #              flightlines_df$flightlines[1])
 
-# save_spectra('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03', '20140507_152342')
+save_spectra('SUGG', '2014', 'OSBS', 'SUGG_AOSpts', 'D03', '20140507_154756')
 
+
+save_spectra('CRAM', '2019', 'UNDE', 'CRAM_AOSpts', 'D05', '20190606_192344') # no cells?
+save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_161319') # no cells
+save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162051') # no cells
+save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162804') # no cells
+
+my_aq_site <- 'SUGG'
+my_aop_yr <- '2014'
+my_aop_site <- 'OSBS'
+my_aq_polygon <- 'SUGG_AOSpts'
+my_domain <- 'D03'
+flightline <- '20140507_154756'
 
 save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
                          my_aq_polygon, my_domain, flightline){
   
+  data_dir <- '/Volumes/hondula/DATA'
   polygon_file <- glue::glue('{data_dir}/AOP/site-polygons/{my_aq_polygon}.shp')
   my_water_sf <- sf::st_read(polygon_file)
   spectra_out_dir <- glue::glue('{data_dir}/L1-refl-spectra')
@@ -147,6 +135,8 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
                   cellx = my_cell_xys[, 1],
                   celly = my_cell_xys[,2]) %>%
     dplyr::filter(!is.nan(cellid))
+  
+  if(nrow(cellinfo_df)<1){stop('cell ids are all NaN')}
   
   # should first check whether pixels are in NA region of raster!! 
   # otherwise getting lots of -9999s for no reason
