@@ -71,13 +71,33 @@ flightline <- '20140507_152342'
 save_spectra('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03', '20140507_152342')
 save_spectra('TOMB', '2017', 'LENO', 'TOMB_AOSpts', 'D08', '20170517_190309')
 
+
+# to combine and save spectra metadata after moving to results folder:
+# gets rid of duplicated spectra (at buoy replicates)
+# creates spectra ID based on 4 character site ID
+cell_info_df <- fs::dir_ls('results/L1-reflectance/meta') %>% vroom::vroom()
+cell_info_df <- cell_info_df %>% 
+  dplyr::filter(sensor_zenith != -9999) %>%
+  mutate(loctype = str_sub(loctype, 1, 4)) %>%
+  mutate(spectraID = glue('{siteID}-{loctype}-{flightline}'))
+cell_info_df %>% 
+  dplyr::select(-nmdLctn) %>% 
+  distinct() %>%
+  mutate(flightdate = lubridate::as_date(str_sub(flightline, 1, 8))) %>%
+  dplyr::select(domanID, siteID, aop_site, loctype, flightline, flightdate,
+                spectraID, sensor_zenith, solar_zenith, cellx, celly, crs,
+                clouds) %>% write_csv('results/spectra-ids.csv')
+
 save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
                          my_aq_polygon, my_domain, flightline){
   
+  # where are input data
   data_dir <- '/Volumes/hondula/DATA'
+  # where to save output data
+  spectra_out_dir <- glue::glue('{data_dir}/L1-refl-spectra')
+  # read in shp of coordinates to pull spectra from 
   polygon_file <- glue::glue('{data_dir}/AOP/site-polygons/{my_aq_polygon}.shp')
   my_water_sf <- sf::st_read(polygon_file)
-  spectra_out_dir <- glue::glue('{data_dir}/L1-refl-spectra')
   
   # check for duplicate named points in shp file... add new identifier?
   
@@ -85,8 +105,10 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_site_dir <- glue::glue('{data_dir}/AOP/ReflectanceL1/{my_aop_yr}/{my_aop_site}')
   my_h5_file <- fs::dir_ls(my_site_dir, glob = glue::glue('*{flightline}*.h5'))
   
-  # file metadata
+  # open connection
   my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
+  
+  # file metadata
   epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
   my_epsg <- my_h5[[epsg_path]]$read()
   
@@ -96,14 +118,13 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   wls_path <- glue('{my_aop_site}/Reflectance/Metadata/Spectral_Data/Wavelength')
   my_wls <- my_h5[[wls_path]]$read()
   
-  # reflectance and metadata
+  # reflectance and reflectance metadata
   my_refl <- my_h5[[glue('{my_aop_site}/Reflectance/Reflectance_Data')]]
   scale_factor <- my_refl$attr_open('Scale_Factor')$read()
   na_value <- my_refl$attr_open('Data_Ignore_Value')$read()
   cloud_conditions <- my_refl$attr_open('Cloud conditions')$read()
   
-  # extent
-  
+  # get map info for extent
   map_info_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/Map_Info')
   map_info <- my_h5[[map_info_path]]$read() %>% strsplit(',') %>% unlist()
   my_dims <- my_refl$dims
@@ -114,7 +135,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   ymin <- ymax - my_dims[3] * xy_resolution[2]
   my_extent <- terra::ext(xmin, xmax, ymin, ymax)
   
-  # blank raster with map info
+  # blank raster based on map info
   my_epsg2 <- glue('EPSG:{my_epsg}')
   my_rast <- terra::rast(ncols = my_dims[2],
                          nrows = my_dims[3],
@@ -130,6 +151,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   my_cellrowcols <- terra::rowColFromCell(my_rast, my_cellids)
   my_cell_xys <- terra::xyFromCell(my_rast, my_cellids)
 
+  # metadata for each pixel 
   cellinfo_df <- my_water_sf %>% 
     st_drop_geometry() %>%
     dplyr::mutate(cellid = my_cellids,
@@ -139,7 +161,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
                   celly = my_cell_xys[,2]) %>%
     dplyr::filter(!is.nan(cellid))
   
-  
+
   if(nrow(cellinfo_df)<1){stop('cell ids are all NaN')}
   
   # should first check whether pixels are in NA region of raster!! 
