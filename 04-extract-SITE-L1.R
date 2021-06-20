@@ -54,6 +54,7 @@ flightlines_df <- read_csv('results/l1-flightlines-wDomain.csv') %>%
 #              flightlines_df$shp[1], 
 #              flightlines_df$domainID[1], 
 #              flightlines_df$flightlines[1])
+save_spectra('PRLA', '2019', 'WOOD', 'PRLA_AOSpts', 'D09', '20190726_151709')
 
 save_spectra('SUGG', '2014', 'OSBS', 'SUGG_AOSpts', 'D03', '20140507_154756')
 save_spectra('CRAM', '2019', 'UNDE', 'CRAM_AOSpts', 'D05', '20190606_192344') # no cells?
