@@ -62,12 +62,12 @@ save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_161319') # 
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162051') # no cells
 save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162804') # no cells
 
-my_aq_site <- 'BARC'
+my_aq_site <- '2019'
 my_aop_yr <- '2014'
-my_aop_site <- 'OSBS'
-my_aq_polygon <- 'BARC_AOSpts'
-my_domain <- 'D03'
-flightline <- '20140507_152342'
+my_aop_site <- 'WOOD'
+my_aq_polygon <- 'PRLA_AOSpts'
+my_domain <- 'D09'
+flightline <- '20190726_151709'
 
 save_spectra('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03', '20140507_152342')
 save_spectra('TOMB', '2017', 'LENO', 'TOMB_AOSpts', 'D08', '20170517_190309')
@@ -104,7 +104,6 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   cloud_conditions <- my_refl$attr_open('Cloud conditions')$read()
   
   # extent
-  
   map_info_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/Map_Info')
   map_info <- my_h5[[map_info_path]]$read() %>% strsplit(',') %>% unlist()
   my_dims <- my_refl$dims
