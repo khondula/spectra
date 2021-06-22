@@ -183,13 +183,16 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
       terra::crs(my_rast3) <- my_epsg2
       plot(my_rast3$wl1)
       
+      my_aq_prj_buff <- st_buffer(my_aq_prj, -50)
       ggplot() +
         geom_stars(data = st_as_stars(my_rast3$wl1)) +
         geom_sf(data = my_aq_prj, fill = NA, col = 'green') +
+        geom_sf(data = my_aq_prj_buff, fill = NA, col = 'green') +
         ggtitle('testing glint stuff wl 75')
       
       ggsave('figs/barc-wl75.png')  
       
+
       d760 <- function(img, ii, jj, kk){
         bi <- img[[ii]]
         bj <- img[[jj]]
@@ -198,18 +201,40 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
         return(d760)
       }
       my_d760 <- d760(my_rast3, 1, 2, 3)
-      
+      my_aq_prj_buff_spat <- my_aq_prj_buff %>% as('SpatVector')
+      my_d760_mask <- terra::mask(my_d760, my_aq_prj_buff_spat, inverse = FALSE)
+      my_d760_mask[my_d760_mask<0] <- NA
       ggplot() +
-        geom_stars(data = st_as_stars(my_d760/1000)) +
+        geom_stars(data = st_as_stars(my_d760_mask/1000)) +
         geom_sf(data = my_aq_prj, fill = NA, col = 'green') +
-        scale_fill_viridis_c() +
+        scale_fill_continuous_diverging(palette = 'Purple-Green', mid = 0, limits = c(-0.05, NA)) +
         ggtitle('testing glint stuff wl 75')
       
+      ggsave('figs/d760.pdf', height = 20, width = 20)
       # my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[glint_bands, cellinfo_df[['cellcol']][.x], cellinfo_df[['cellrow']][.x]])
       my_spectra_list[1]
       # make into a rast for plotting...
-      
+      r <- raster::raster(my_d760_mask)
+      r <- raster::raster(my_d760)
+      library(leaflet)
+      library(leafem)
 
+      leaflet(r) %>%
+        addProviderTiles(providers$Esri.WorldImagery) %>%
+        addRasterImage(r, group = 'd760', layerId = "wl1") %>%
+        addImageQuery(r, layerId = "wl1") %>%
+        addLayersControl(overlayGroups = c('d760'))
+      
+      leaflet(r) %>%
+        addProviderTiles(providers$Esri.WorldImagery) %>%
+        addRasterImage(r$wl1) %>%
+        addImageQuery(r$wl1)
+
+      #
+      #
+      #
+      #
+      
       names(my_spectra_list) <- cellinfo_df$cellid
       
       spectra_df <- my_spectra_list %>% 
