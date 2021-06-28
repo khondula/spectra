@@ -64,6 +64,8 @@ save_spectra('PRPO', '2020', 'WOOD', 'PRPO_AOSpts', 'D09', '20200624_162804') # 
 
 my_aq_site <- 'PRLA'
 my_aop_yr <- '2019'
+my_aq_site <- '2019'
+my_aop_yr <- '2014'
 my_aop_site <- 'WOOD'
 my_aq_polygon <- 'PRLA_AOSpts'
 my_domain <- 'D09'
@@ -125,6 +127,7 @@ save_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
   na_value <- my_refl$attr_open('Data_Ignore_Value')$read()
   cloud_conditions <- my_refl$attr_open('Cloud conditions')$read()
   
+  # extent
   # get map info for extent
   map_info_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/Map_Info')
   map_info <- my_h5[[map_info_path]]$read() %>% strsplit(',') %>% unlist()
