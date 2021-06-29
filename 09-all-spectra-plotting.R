@@ -2,55 +2,26 @@ library(tidyverse)
 library(glue)
 
 # copy over meta and spectra from Volumes to results for reading in
-cell_info_df <- fs::dir_ls('results/L1-reflectance2/meta') %>% 
-  vroom::vroom() %>% dplyr::filter(sensor_zenith != '-9999')
+cell_info_df <- fs::dir_ls('/Volumes/hondula/DATA/L1-reflectance/meta') %>% 
+  vroom::vroom() %>% dplyr::filter(sensor_zenith != '-9999') %>%
+  mutate(flightdate = lubridate::as_date(str_sub(flightline, 1, 8)))
+# 221 non-NA l1 reflectance spectra
 
-cell_info_df <- cell_info_df %>% 
-  dplyr::mutate(flightdate = purrr::map_chr(reflectfile, ~str_split(.x, "_", simplify = TRUE)[5])) %>%
-  dplyr::mutate(flightdate = lubridate::as_date(flightdate))
+rad_info_df <- fs::dir_ls('/Volumes/hondula/DATA/L1-radiance/meta', glob = '*BLUE*', invert = TRUE) %>% vroom::vroom(delim = ',')
+rad_info_df %>% dplyr::filter(gpstime_hrs != '-9999') %>% write_csv('results/radiance-gpstime.csv')
 
-# cell_info_df$reflectfile %>% purrr::map_chr(~str_split(.x, "_", simplify = TRUE)[5])
-
-nrow(cell_info_df)
-cell_info_df %>% pull(reflectfile) %>% unique() %>% length()
-# 282 non-NA l1 reflectance spectra
-
-radnames <- fs::dir_ls('results/L1-radiance/meta', glob = '*BLUE*', invert = TRUE) %>%
-  purrr::map(~names(read_csv(.x)))
-# radnames[18]
-
-rad_info_df <- fs::dir_ls('results/L1-radiance/meta', glob = '*BLUE*', invert = TRUE) %>%
-  vroom::vroom(delim = ',')
-rad_info_df %>%
-  dplyr::filter(gpstime_hrs != '-9999') %>%
-  write_csv('results/radiance-gpstime.csv')
-# rad_info_df %>%
-#   dplyr::filter(gpstime_hrs != '-9999') %>%
-#   dplyr::select(-loctype, -nmdLctn) %>%
-#   distinct() %>% nrow()
-# rad_info_df %>%
-#   dplyr::filter(gpstime_hrs != '-9999') %>%
-#   pull(radfile) %>% unique() %>% length()
-# 
-# rad_info_df$radfile[1]
 rad_info_df <- read_csv('results/radiance-gpstime.csv') %>%
+  dplyr::select(siteID, nmdLctn, cellx, celly, radfile, gpstime_hrs) %>%
   mutate(flightdate = lubridate::as_date(str_sub(radfile, 1, 8))) %>%
   dplyr::filter(gpstime_hrs != '-9999') %>%
-  dplyr::select(siteID, cellid, cellrow, cellcol, radfile, gpstime_hrs, flightdate) %>%
   distinct()
 rad_info_df
-# 258 non-NA L1 radiance data (no duplicates for buoy depths)
-names(cell_info_df)
-names(rad_info_df)
 
-cell_info_join <- cell_info_df %>% 
-  left_join(rad_info_df, by = c('siteID', 'cellid', 'cellrow', 'cellcol', 'flightdate'))
+cell_info_join <- cell_info_df %>% left_join(rad_info_df, by = c('siteID', 'nmdLctn', 'cellx', 'celly', 'flightdate'))
 
 cell_info_join %>% write_csv('results/l1-info.csv')
 
-cell_info_join <- read_csv('results/l1-info.csv')
-
-# cell_info_df %>% write_csv('results/spectra-ids.csv')
+cell_info_df <- read_csv('results/l1-info.csv')
 
 mysite <- 'TOMB'
 
