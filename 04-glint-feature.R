@@ -4,12 +4,13 @@
 # library(neonhs)
 # library(viridis)
 # library(raster)
+library(colorspace)
 library(hdf5r)
 library(sf)
 library(tidyverse)
 library(glue)
-# library(terra)
-# library(stars)
+library(terra)
+library(stars)
 # library(scico)
 # library(vroom)
 # source('R/myfxns.R')
@@ -17,70 +18,37 @@ library(glue)
 # set up
 # spectra_dir <- 'H:/DATA/spectra_site/'
 
-# fs::dir_ls('H:/DATA/AOP/site-polygons')
+data_dir <- '/Volumes/hondula/DATA'
+fs::dir_ls(glue('{data_dir}/AOP/site-polygons'))
+my_aq_polygon <- 'PRLA_2016'
+polygon_file <- glue::glue('{data_dir}/AOP/site-polygons/{my_aq_polygon}.shp')
+my_water_sf <- sf::st_read(polygon_file)
 
-# my_water_sf <- st_read('H:/DATA/AOP/site-polygons/PRLA_2016.shp')
-
-# data_dir <- '/Volumes/hondula/DATA'
-data_dir <- 'H:/DATA/'
-
-my_aq_site <- 'BARC'
-my_aop_yr <- '2016'
-my_aop_site <- 'OSBS'
-my_aq_polygon <- 'BARC_2018'
-my_domain <- 'D03'
-
-
-# save_radiance_gpstime('SUGG', '2014', 'OSBS', 'SUGG_AOSpts', 'D03')
-# save_radiance_gpstime('BARC', '2014', 'OSBS', 'BARC_AOSpts', 'D03')
-save_L1reflectance_spectra('PRLA', '2016', 'WOOD', 'PRLA_AOSpts', 'D09')
-save_L1reflectance_spectra('PRPO', '2016', 'WOOD', 'PRPO_AOSpts', 'D09')
-
-save_L1reflectance_spectra('BARC', '2016', 'OSBS', 'BARC_AOSpts', 'D03')
-save_L1reflectance_spectra('BARC', '2019', 'OSBS', 'BARC_AOSpts', 'D03')
-save_L1reflectance_spectra('SUGG', '2016', 'OSBS', 'SUGG_AOSpts', 'D03')
-save_L1reflectance_spectra('SUGG', '2019', 'OSBS', 'SUGG_AOSpts', 'D03')
-
-save_L1reflectance_spectra('FLNT', '2014', 'JERC', 'FLNT_AOSpts', 'D03')
-save_L1reflectance_spectra('FLNT', '2016', 'JERC', 'FLNT_AOSpts', 'D03')
-
-save_L1reflectance_spectra('BLWA', '2015', 'DELA', 'BLWA_AOSpts', 'D08')
-save_L1reflectance_spectra('BLWA', '2016', 'DELA', 'BLWA_AOSpts', 'D08')
-
-save_L1reflectance_spectra('TOMB', '2015', 'LENO', 'TOMB_AOSpts', 'D08')
-save_L1reflectance_spectra('TOMB', '2016', 'LENO', 'TOMB_AOSpts', 'D08')
-
-
-flightlines_df <- read_csv('results/l1-flightlines-wDomain.csv') %>%
-  dplyr::select(aq_site, aop_yr, aop_site, shp, domainID) %>% dplyr::distinct()
-
-1:nrow(flightlines_df) %>% 
-  purrr::walk(~save_radiance_gpstime(flightlines_df$aq_site[.x], 
-                                    flightlines_df$aop_yr[.x], 
-                                    flightlines_df$aop_site[.x], 
-                                    flightlines_df$shp[.x], 
-                                    flightlines_df$domainID[.x]))
+my_aq_site <- 'PRLA'
+my_aop_yr <- '2017'
+my_aop_site <- 'WOOD'
+# my_aq_polygon <- 'BARC_2018'
+my_domain <- 'D09'
 
 # note this assumes that all flightlines are in the same CRS for a siteyear
 # need to redo BLUE to work with s2 loctype
 
-save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
-                         my_aq_polygon, my_domain){
+# save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site, 
+#                          my_aq_polygon, my_domain){
   
-  data_dir <- 'H:/DATA/'
+  # data_dir <- /Volumes/hondula/DATA'
   polygon_file <- glue::glue('{data_dir}/AOP/site-polygons/{my_aq_polygon}.shp')
   my_water_sf <- sf::st_read(polygon_file)
-  out_dir <- glue::glue('{data_dir}/L1-reflectance2')
+  # out_dir <- glue::glue('{data_dir}/L1-reflectance2')
   
-  # first need to find which h5 files have points
-  my_site_dir <- glue('D:/{my_aop_yr}/FullSite/{my_domain}') %>%
-    fs::dir_ls(glob = glue('*{my_aop_site}*'), type = 'directory')
-  my_site_files <- glue('{my_site_dir}/L1/Spectrometer/ReflectanceH5') %>%
-    fs::dir_ls(glob = '*.h5', recurse = TRUE)
+  if(data_dir == '/Volumes/hondula/DATA'){
+    my_site_dir <- glue('{data_dir}/AOP/ReflectanceL1/{my_aop_yr}/{my_aop_site}')
+    my_site_files <- glue('{my_site_dir}') %>%
+      fs::dir_ls(glob = '*.h5', recurse = TRUE)
+  }
   
   # get the projection info from the first file
   my_h5_file <- my_site_files[1]
-  
   my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
   epsg_path <- glue('{my_aop_site}/Reflectance/Metadata/Coordinate_System/EPSG Code')
   my_epsg <- my_h5[[epsg_path]]$read() %>% as.integer()
@@ -93,7 +61,7 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
 
   # FOR each of the flightline files
   
-  for(i in 1:length(my_site_files)){
+  # for(i in 1:length(my_site_files)){
     my_h5_file <- my_site_files[i]
     my_h5 <- hdf5r::H5File$new(my_h5_file, mode = "r")
     my_base_filename <- basename(my_h5_file) %>% tools::file_path_sans_ext()
@@ -148,8 +116,6 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
     my_cellx_range <- range(cellinfo_df$cellx)
     my_celly_range <- range(cellinfo_df$celly)
     
-    # should first check whether pixels are in NA region of raster!! 
-    # otherwise getting lots of -9999s for no reason
     # get reflectance data and metadata
       
       my_epsg <- my_h5[[epsg_path]]$read()
@@ -169,6 +135,8 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
       # get glint_wl,  + 1 and 
       glint_wl <- which.min(abs(760-my_wls))
       glint_bands <- c(glint_wl-1, glint_wl, glint_wl+1)
+      
+      # make raster with 3 bands for glint
       wl760_rast <- terra::rast(my_refl[76, my_cols[1]:my_cols[2], my_rows[1]:my_rows[2]])
       plot(wl760_rast)
       my_spectra_list <- purrr::map(glint_bands,
@@ -183,14 +151,15 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
       terra::crs(my_rast3) <- my_epsg2
       plot(my_rast3$wl1)
       
-      my_aq_prj_buff <- st_buffer(my_aq_prj, -50)
+      # my_aq_prj
+      my_aq_prj_buff <- st_buffer(my_aq_prj, 10)
       ggplot() +
         geom_stars(data = st_as_stars(my_rast3$wl1)) +
         geom_sf(data = my_aq_prj, fill = NA, col = 'green') +
-        geom_sf(data = my_aq_prj_buff, fill = NA, col = 'green') +
-        ggtitle('testing glint stuff wl 75')
+        # geom_sf(data = my_aq_prj_buff, fill = NA, col = 'green') +
+        ggtitle('testing glint stuff d760')
       
-      ggsave('figs/barc-wl75.png')  
+      # ggsave('figs/barc-wl75.png')  
       
 
       d760 <- function(img, ii, jj, kk){
@@ -203,14 +172,15 @@ save_L1reflectance_spectra <- function(my_aq_site, my_aop_yr, my_aop_site,
       my_d760 <- d760(my_rast3, 1, 2, 3)
       my_aq_prj_buff_spat <- my_aq_prj_buff %>% as('SpatVector')
       my_d760_mask <- terra::mask(my_d760, my_aq_prj_buff_spat, inverse = FALSE)
-      my_d760_mask[my_d760_mask<0] <- NA
+      # my_d760_mask[my_d760_mask<0] <- NA
       ggplot() +
         geom_stars(data = st_as_stars(my_d760_mask/1000)) +
-        geom_sf(data = my_aq_prj, fill = NA, col = 'green') +
-        scale_fill_continuous_diverging(palette = 'Purple-Green', mid = 0, limits = c(-0.05, NA)) +
-        ggtitle('testing glint stuff wl 75')
+        geom_sf(data = my_aq_prj, fill = NA, col = 'blue') +
+        scale_fill_viridis_c() +
+        # scale_fill_continuous_diverging(palette = 'Purple-Green', mid = 0, limits = c(-0.05, NA)) +
+        ggtitle('testing glint stuff d760 ')
       
-      ggsave('figs/d760.pdf', height = 20, width = 20)
+      ggsave(glue('figs/{my_aq_site}-{my_aop_yr}-d760.pdf'), height = 20, width = 20)
       # my_spectra_list <- purrr::map(1:nrow(cellinfo_df), ~my_refl[glint_bands, cellinfo_df[['cellcol']][.x], cellinfo_df[['cellrow']][.x]])
       my_spectra_list[1]
       # make into a rast for plotting...

@@ -1,4 +1,5 @@
 # spectra in WASI
+# WASI 
 
 wasi_data_dir <- 'C:/Users/hondula/Downloads/WASI4/DATA'
 fs::dir_ls(wasi_data_dir)

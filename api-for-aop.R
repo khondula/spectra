@@ -10,23 +10,26 @@ library(sf)
 
 # set up
 l1_refl_id <- 'DP1.30006.001'
-my_aq_site <- 'BARC'
-my_aop_site <- 'OSBS'
-my_domain <- 'D03'
-my_aq_polygon <- 'BARC_AOSpts'
+my_aq_site <- 'BLWA'
+my_aop_site <- 'DELA'
+my_domain <- 'D08'
+my_aq_polygon <- 'BLWA_AOSpts'
 my_water_sf <- st_read(glue('/Volumes/hondula/DATA/AOP/site-polygons/{my_aq_polygon}.shp'))
 
 get_flightline_ids('BLUE', 'BLUE_AOSpts')
 get_flightline_ids('DELA', 'BLWA_AOSpts')
-get_flightline_ids('LENO', 'TOMB_AOSpts')
 get_flightline_ids('JERC', 'FLNT_AOSpts')
+get_flightline_ids('LENO', 'TOMB_AOSpts')
 get_flightline_ids('LIRO', 'LIRO_AOSpts')
-get_flightline_ids('OSBS', 'SUGG_AOSpts')
+get_flightline_ids('OSBS', 'SUGG_AOSpts', keep_kmls = TRUE)
 get_flightline_ids('OSBS', 'BARC_AOSpts')
+get_flightline_ids('TOOL', 'TOOK_AOSpts')
+get_flightline_ids('UNDE', 'CRAM_AOSpts')
 get_flightline_ids('WOOD', 'PRPO_AOSpts')
 get_flightline_ids('WOOD', 'PRLA_AOSpts')
-get_flightline_ids('UNDE', 'CRAM_AOSpts')
-get_flightline_ids('TOOL', 'TOOK_AOSpts')
+
+fs::dir_ls('results/l1-flightlines') %>%
+  purrr::map_df(~read_csv(.x)) %>% write_csv('results/l1-flightlines.csv')
 
 get_flightline_ids <- function(my_aop_site, 
                                # my_aop_yr, 

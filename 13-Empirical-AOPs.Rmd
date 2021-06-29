@@ -1,0 +1,230 @@
+---
+title: "11-Empirical-AOPs"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(glue)
+library(tidyverse)
+library(readxl)
+library(fs)
+library(vroom)
+library(lubridate)
+```
+
+Comparing reflectance data to closest samples collected from each site
+
+* chl a
+* TSS
+* SUVA 254
+* SUVA 280
+* DOC
+
+```{r}
+# all_overlaps_df <- read_csv("results/overlaps.csv")
+# overlap_summary %>% write_csv('results/overlap-summary.csv')
+```
+
+Join with spectra
+
+> TODO: scale spectra by zenith angle (and surface factor?) to compare properly
+
+```{r}
+spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m"
+spectra_df <- fs::dir_ls(spectra_dir) %>% vroom(id = "filename")
+
+my_spectra_df$sitecode[1]
+
+my_spectra_df <- spectra_df %>% filter(my_cellid) %>%
+  mutate(sitecode = gsub("-buff5m.csv", "", basename(filename))) %>%
+  mutate(aq_site = substr(sitecode, 1, 4),
+         aop_yr = substr(sitecode, 6, 9)) %>%
+  mutate(aop_siteyear = glue("{aq_site}{aop_yr}")) %>%
+  dplyr::select(-filename)
+
+my_spectra_df2 <- my_spectra_df %>%
+  dplyr::select(aop_siteyear, wavelength, reflectance)
+
+spectra_join <- overlap_summary %>% left_join(my_spectra_df2, by = "aop_siteyear")
+spectra_join %>% write_csv('results/spectra_join.csv')
+```
+
+```{r}
+lake_river_sites <- c("BARC", "CRAM", "FLNT", "LIRO", "PRLA", "PRPO", "SUGG",
+                      "TOMB", "TOOK")
+spectra_join %>%
+  dplyr::filter(aq_site %in% lake_river_sites) %>%
+  ggplot(aes(x = wavelength, y = reflectance, group = aop_siteyear)) +
+  geom_vline(xintercept = c(665, 442), col = "red", lwd = 2, alpha = 0.5) +
+  # geom_line(aes(col = aq_site)) +
+  geom_line(aes(col = DOC)) +
+  # geom_point() +
+  # facet_wrap(vars(aop_yr), scales = "free", ncol = 1) +
+  coord_cartesian(ylim = c(0, 0.1)) +
+  scale_color_viridis_c() +
+  theme_bw()
+
+spectra_join %>%
+  dplyr::filter(aq_site %in% lake_river_sites) %>%
+  ggplot(aes(x = wavelength, y = reflectance, group = aop_siteyear)) +
+  geom_vline(xintercept = c(665, 442), col = "red", lwd = 2, alpha = 0.5) +
+  # geom_line(aes(col = aq_site)) +
+  geom_line(aes(col = `UV Absorbance (250 nm)`)) +
+  # geom_point() +
+  # facet_wrap(vars(aop_yr), scales = "free", ncol = 1) +
+  coord_cartesian(ylim = c(0, 0.1)) +
+  scale_color_viridis_c() +
+  theme_bw()
+```
+
+```{r}
+s1 <- spectra_join %>%
+  dplyr::filter(aq_site %in% lake_river_sites) %>%
+  ggplot(aes(x = wavelength, y = reflectance, group = aop_siteyear, hover_css = "fill:none;")) +
+    geom_vline(xintercept = c(665, 442), col = "red", lwd = 2, alpha = 0.5) +
+            coord_cartesian(ylim = c(0, 0.1)) +
+            scale_color_viridis_c() +
+            theme_bw() + 
+  geom_line_interactive(aes(col = DOC, 
+                            tooltip = glue("{aop_siteyear}
+                                           {flightdate}
+                                           DOC: {DOC}
+                                           chla: {`chlorophyll a`}
+                                           tss: {TSS}
+                                           suva254: {`UV Absorbance (250 nm)`}"), 
+                            data_id = aop_siteyear))
+x3 <- girafe(code = print(s1), width_svg = 8,
+                     options = list(
+                         opts_hover_inv(css = "opacity:0.3;"),
+                         opts_hover(css = "stroke-width:3;")))
+x3
+```
+
+
+```{r}
+spectra_join %>%
+  dplyr::filter(analyteid == "SUVA254") %>%
+  dplyr::filter(analyteConcentration < 1) %>%
+  # dplyr::filter(wavelength %in% c(484, 489, 499)) %>% 
+  dplyr::filter(wavelength < 500) %>% 
+  ggplot(aes(x = analyteConcentration, y = reflectance)) +
+  geom_smooth(method = "lm") +
+  geom_point(aes(fill = aop_siteyear), pch = 21) +
+  # xlim(0, 1) +
+  facet_wrap(vars(wavelength), scales = "free")
+```
+
+```{r}
+spectra_join %>%
+  dplyr::filter(analyteid == "chla") %>%
+  dplyr::filter(analyte == "chlorophyll a") %>%
+  dplyr::filter(analyteConcentration < 20) %>%
+  # dplyr::filter(wavelength %in% c(412)) %>%
+  dplyr::filter(wavelength < 500) %>%
+  # dplyr::filter(wavelength %in% 500:600) %>%
+  # dplyr::filter(wavelength %in% 600:700) %>%
+  ggplot(aes(x = analyteConcentration, y = reflectance)) +
+  geom_smooth(method = "lm") +
+  geom_point(aes(fill = aop_siteyear), pch = 21, size = 2) +
+  # xlim(0, 1) +
+  theme_bw() +
+  facet_wrap(vars(wavelength), scales = "free")
+```
+
+> TODO: Calculate some band ratios vs in situ abs
+
+490/555
+412/555
+412/665
+
+
+## Relationships found in other studies
+
+* Menken et al 2006 - low reflectance with higher CDOM especially below 500 nm
+* Menken et al 2006 - **ratio of 700 nm/670 nm** best predictor of chl a over a 
+wide variety of conditions
+* Menken et al 2006 - **ratio of 670 nm/571 nm** best estimate of humic color
+* cited in Menken et al 2006, Gorden and Morel 1983 used ratio 440/550 to 
+estimate chl in oligotrophic waters
+* cited in Menken et al 2006, Strombeck and Pierson 2001 reported absorbance
+of red light can be significant at high CDOM concentrations
+
+* chl absorbance minimum near 440 nm (Gitelson et al 200)
+* carotenoids absorbance min at 490 nm (Yacobi et al 1995)
+* Green reflectance peak ~ 550 nm from green algae (absorb in red and blue
+but minimal absorbance in green)
+* reflectance minimum at 670 nm from chl a absorbance, also affected by 
+scattering from cell walls
+* reflectance peak at 700 nm from low chl a and strong scattering by algal 
+cell walls and other seston
+
+* chloroplatinate units from absorbance at 440 nm (Cuthbert and del 
+Giorgio 1992, cited in Menken et al 2006): CPU = 18.22 * (abs440) - 0.209
+
+* reflectance in blue region less sensitive to phytoplankton density
+because of absorbance by CDOM and particle scattering affecting 
+reflectance more than chl (Gitelson et al 2000)
+
+* Oceanography model based on reflectance at 412, 443, 488, 551 nm (Cardner
+et al 2003), for chl a < ~ 2 mg/m3. Above that, polynomial relationship
+based on **ratio of 488 and 551 nm**
+
+MODIS empirical equation for chl a from Carder et al 2003, also used in 
+Menken et al 2006
+
+$log(Chl a) = 0.711 + 1.62 \times log(R_{488}/R_{551}) + 7.686 \times log(R_{488}/R_{551})^2 + 4.09 \times log(R_{488}/R_{551})^3$
+
+Nonlinear forms based on wavelengths and ratios in Arenz et al 1996, 
+as in Menken et al 2006
+
+$chl a = a_0R^{a1}$
+$chl a = a_0R_{R}^{a1}$
+
+> Use relationships between grab samples and sensor data to estimate
+properties at time of AOP data collection
+
+
+## Band ratio regressions
+
+Test for what channel ratios have significant correlations with in situ parameters
+
+$$ chl a = a_0 + a_1 \bigg(\frac{L(\lambda_1)}{L(\lambda_2)}\bigg)$$
+According to Dekker (1993) and Gitelson et al. (1993), a spectral radiance or reflectance ratio using a wavelength band with a center wavelength ranging in the interval from approximately 680-710 nm (the region of the chlorophyll fluorescence peak) as numerator, and a band with center wavelength at approximately 665-680 nm (the region of the chlorophyll absorption max) as denominator is a proper choice for chl-a retrieval. 
+
+
+> TODO: calculate ratio between all bands, regress and calculate correlations across sites
+
+do this for chl a, DOC, TSS, SUVAs, any other water quality params. (concentrations)
+
+> THEN, compare ratios to sensor measurements 
+
+(chla, nitrate, turbidity, fDOM)
+
+> THEN, estimate chla, DOC, TSS at time of flights 
+
+compare fits, see if error is associated with the time difference (or random). do models fit better with estimates for exact timing? 
+
+what is changing over small timescales that could be affecting things? 
+
+Beck et al 2019 tested 37 algorithms and 321 variants for turbidity
+
+
+categorization of trophic status based on annual max chl a (OECD 1982)
+
+* oligotrophic: chl a < 8 ug/L
+* mesotrophic: chl a between 8 and 25 ug/L
+* eutrophic: chla > 25 ug/L
+* humic (regardless of chla), high concentration of humus and low tss
+
+
+how do turbidity and chl a covary?
+
+Pulliainen use spectral shape metrics to separate trophic status of lakes
+
+> TODO: compare ratios with radiance data and atmospheric corrected data
