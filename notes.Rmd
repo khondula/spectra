@@ -1,0 +1,360 @@
+---
+title: "Notes"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Aquatic Remote Sensing
+
+## Reflectance terminology
+
+### Definitions and theory
+
+* [Overview from ocean optics book](https://www.oceanopticsbook.info/view/inherent-and-apparent-optical-properties/reflectances) of $R_{rs}$ vs. $R$ - better AOP because it is less sensitive to sky conditions while remaining very sensitive to different IOPs
+* **Remote sensing reflectance** $R_{rs}(\lambda)$ ($sr^-1$) is ratio of water leaving *radiance* to total downwelling irradiance
+* **Reflectance** $R(\lambda)$ (unitless) can be defined as ratio of subsurface upwelling irradiance ($E_u^-(\lambda)$) (flux per unit surface area) to subsurface downwelling irradiance ($E_d^-(\lambda)$), and is a function of the surface (specific IOPs and concentrations/abundance of water constituents), illumniation, and observation angles (but not on the instrument or irradiance received). Albedo is the average over the whole spectrum. 
+* **Radiance** measures flux per unit area and per unit solid angle. $L(\theta, \phi)$ is the radiance in direction of zenith (vertical) angle $\theta$ and azimuth (horizontal) angle $\phi$. Integrate $L$ over the appropriate angles to get **irradiance**. 
+* Normalized water-leaving reflectance $R_w$ from atmospheric correction
+* **Scalar irradiance** $(E_0)$ is the flux received by a spherical collector from all directions. This concept (how flux varies by direction) is needed to account for the portion of the signal that the sensor sees compared to all of the water-leaving irradiance.
+
+
+
+$$R(\lambda, z) = \frac{E_u(\lambda, z)}{E_d(\lambda, z)}$$
+$$R_{rs}(\theta, \phi, \lambda, 0) = \frac{L(\theta, \phi, \lambda, 0)}{E_d(\lambda, 0)}$$
+A proportionality factor $Q(\theta, \phi, \lambda)$ in units of [sr] can relate $R_{RS}$ to $R$. (also called the light distribution factor, Q).
+
+NEON measurements are non-dimensional reflectance ($\\rho = \frac{\pi L}{cos\theta_0 (F_0)}$). $F_0$ is extraterrestrial solar irradiance, and ATCOR is used for atmospheric correction (assume this approximates $E_d$, or ($F_0 f_s t_{ds})$) (variations in earth-sun distance and transmittance of diffuse radiation through atmosphere.) Not accounted for is BDRF (assume BDRF = 1). Also assumes that $L_w$ (water-leaving radiance) is $L_{total}$, i.e. no glint/reflected light ($L_r = 0$). $\theta$ is the [solar zenith angle](https://www.usgs.gov/land-resources/nli/landsat/solar-illumination-and-sensor-viewing-angle-coefficient-files), where smaller values mean sun closest to nadir.
+
+$$\rho = \frac{\pi L}{cos\theta_0 (E_d)}
+\\R_{rs} = \frac{L_w}{E_d} \times f_{bdrf}(\lambda)
+\\R_{rs} = \rho \times \frac{\cos\theta_s}{\pi}$$
+
+$\pi$ is the light distribution factor ($Q = \frac{E_u}{L_u}$ [$sr^{-1}$]), assuming an *isotropic light field*, where light is reflected evenly in all directions.
+
+![](figs/isotropy.jpeg)
+
+
+### Surface to Subsurface Reflectance 
+
+Airborne measurements are surface reflectance ($R_{rs}$ or $R_{rs}(0+)$), affected by refraction and such at the surface of the water. There's the widely used Gordon et al 1988 model to convert surface to subsurface reflectance ($r_{rs}$ or $R_{rs}(0-)$) - more directly related to IOPS - as well as several alternatives (see appendix A in Werdell et al. 2018). 
+
+
+$$r_{rs} = \frac{R_{rs}(\lambda)}{0.52 + 1.7\ R_{rs}(\lambda)}$$
+### Subsurface Reflectance as a function of IOPs
+
+**Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface based on Monte Carlo simulations. See Lee et al 2002 for some discussion of g1 and g2. 
+
+$$r_{rs}(\lambda) = \frac{L_u(0^-,\lambda)}{E_d(0^-,\lambda)} = g_1\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg) + g_2\bigg(\frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}\bigg)^2$$
+
+* $\frac{b_b}{(a + b_b)}$ in Gordon model can be referred to as $u$. 
+* G1 = 0.0949, G2 = 0.0794, or Lee et al. coefficients
+* G coefficients represent illumination, geometry, and sea surface properties
+
+
+## Atmospheric correction and Glint
+
+* Sensor measurement is upwelling radiance $L_u$, which includes both $L_w$ and reflected radiance from the water surface $L_r$ which has not interacted with the water column and needs to be removed. 
+$L_u = L_w + L_r$
+
+* Review of methods in **Kay et al 2009**
+* In general, methods for high resolution images make no assumptions about the angle of the water surface and instead use image-based information with the assumption of no NIR water leaving radiance
+* $R^{surf}_{rs}(\lambda)$ is reflections at the water surface (glint)
+* POLYMER (Steinmetz et al 2011) shown to work well with MSI, OLCI in optically complex waters 
+* NEON uses ATCOR, which is proprietary but relies a lot on the value of the aerosol optical thickness which is based on observations over "dark dense vegetation".
+* Pahlevan et al 2021 review atmospheric correction for Landsat and Sentinel, comparing to validation data sets. Median errors are 20-30% for the best performing processors, which propagates to 25-75% uncertainty in derived chl a and TSS products.
+* Learn more about FLAASH [here](https://www.l3harrisgeospatial.com/docs/flaash.html)
+
+## Water absorption and scattering
+
+* varies with temperature and salinity
+* Use `approx` to interpolate published spectra to 1 nm.
+* water spectra saved in `data/water-approx1nm.csv`
+* Assume backscattering is half of scattering coefficient
+
+$b_{b,w} = 0.5 b_w$
+
+![](figs/pure-water-rrs.png)
+
+* more absorption data and links compiled [here](https://omlc.org/spectra/water/abs/) 
+* Pope and Fry 1997 absorption 380-700 nm at 2.5 nm res,
+also with standard deviations
+* Comparison plot (Figure 10) to Buiteveld et al, Tam and Patel, Smith and Baker 1981, and Sogandares and Fry
+* Buiteveld 1994 (absorption AND scattering 300-800 nm)
+* More absorbance data in Fewell?
+* Kutser et al models use Smith and Baker 1981 absorbance values
+
+* Buiteveld et al 1994 Table 1 has absorption and scattering coefficients at 20 C, also a proposed temperature dependence (A = absorption increment due to temperature) 
+
+* Bukata CRC book table 4.1 (absorption and scattering 250-800 nm)
+* Optical properties of pure water from multi-author Optics of the Ocean (Russian) 1983 and Smith and Baker 
+* Sogandares and Fry 1997 (Absorption and uncertainty for 10 nm increments 340 to 640 nm)
+* H.Buiteveld, J.H.M. Hakvoort, and M.Donze, "The optical properties of pure water," in Ocean Optics XII, Proc. SPIE 2258, 174-183 (1994). 
+
+## CDOM absorption
+
+* operationally defined based on 0.2 um pore size of filters
+* modeled with a fixed shape (exponential)
+
+$$
+a^*_{dg}(\lambda) = exp(-S_{dg}\lambda)
+$$
+* $S_{dg}$ either a constant value between 0.01- 0.02, region-specific value, or estimated from blue (443) to green (555 or 547) reflectance ratio. Probably inverse relationship with a_{dg}(440). 
+
+$$
+S_{dg} = 0.015 + \frac{0.002}{0.6 + r_{rs}(443)/r_{rs}(55x)}
+$$
+* $S_{cdom}$ range 0.01-0.03 and $S_{nap}$ range 0.005-0.015
+* getting cdom spectral slope from satellite data could provide indicator of source, molecular size, aromatic content, and extent of photochemical vs microbial degradation of organic matter
+* NAP spectral slope can inform proportion of mineral and organic matter (Babin et al 2003)
+* absorbance in red can be significant at high CDOM concentrations
+* most prominent in UV and blue regions (<500 nm)
+* Colored dissolved organic matter, also known as gelbstoff, yellow substance,
+or gilvin. Assumed not to scatter light because pigments are totally dissolved.
+* Absorption maxima of chromophores are in the UV, such as 180, 203, 253 nm for
+benzene (common aromatic ring structure in humic matter)
+* tail of those peaks is approximated by: 
+
+$$a_{CDOM}(\lambda) = a_{CDOM}(\lambda_0) \times {exp}( -S \times (\lambda - \lambda_{0}))$$
+
+* mean values for $S$ are 0.016-0.017 $nm^{-1}$, sd 0.002 $nm^{-1}$, variation is due to composition. Range 0.008 - 0.042 $nm^{-1}$
+
+* CDOM concentration (Y) (proxy for DOC) can be expressed in units of absorption 
+at $\lambda_0$, usually around 400 nm. 
+
+$$Y = a_{CDOM}(\lambda_{0})[m^{-1}]$$
+* Gaussian decomposition method important for terrestrially influence (**Grunert et al 2018**) especially based on lignin absorbance around 276 nm
+
+
+## CDOM algorithms
+
+* ratio of 670/571 nm to estimate humic color (used in Menken et al 2006)
+
+## Phytoplankton absorption background
+
+* either a single spectral shape for $a^*_{ph}(\lambda)$, multiple spectra based on different pigment-based taxonomic groups, or empirically derived Gaussian-based approximations (8 approaches in table 1 of Werdell et al 2018, all based on concentration and some basis for normalized absorption spectra)
+* species-specific algal pigment absorption: cyanobacteria have phycobiliproteins, diatoms have fucoxanthin, and dinoflagellates have peridinin
+* Aguirre-Gomez et al 2001 table 1 has position of peaks of pigments for
+diatoms, green algae, chl a, chl b, chl c1, chl c2, beta-carotene, 
+fucoxanthin
+* cyanobacteria: 620-625 nm is region of phycocyanin absorption and 592 nm is region of B-phycoerythrin absorption (both indicators of cyanobacteria)
+* variations based on type and relative concentrations of phytoplankton, physiological responses to growth conditions including light, nutrient availability, and temperature
+* Phaeopigments are partial degradation products of chlorophyll. Absorb more strongly at 412 nm, whereas chl absorbance peaks are 443 nm and low absorbance at 412
+* Babin et al 2003 found that in some coastal areas (europe) high pheopigment concentrations gave rise to especially high blue-to-red ratio of phytoplankton absorption - a departure from general trend usually found for open oceanic waters for relationship between phytoplankton absorption and chlorophyll concentration
+* causes absorbance minumum near 440 nm
+* carotenoids absorbance minimum near 490 nm
+* green reflectance peak near 550 nm because green algae absorb strongly in red and blue
+* reflectance minimum at 670 nm from chl a absorbance
+* reflectance peak at 700 nm is from combined effect chl a absorbance and particulate scattering
+* less influence in blue region, at least compared to CDOM and particulate scattering
+* chlorophyll flouorescence peak is around 680-710 nm, and chl absorption max is between 665-680 nm
+* there is no functional algorithm to estimate chl a from hyperspectral rs across a wide range of trophic conditions
+* QAA (Lee et al 2002) algorithm, primarily intended for moderately turbid coastal and clear ocean waters but used extensively in aquatic studies
+* Generalized IOP inversion (Werdell et al 2013) algorithm, primarily intended for moderately turbid coastal and clear ocean waters but used extensively in aquatic studies
+
+* trophic status can be classified based on chl a concentration:
+  * oligotrophic: chl a < 8 ug/L
+  * mesotrophic: chl a between 8 and 25 ug/L
+  * eutrophic: chla > 25 ug/L
+  * humic (regardless of chla), high concentration of humus and low tss
+
+chl conc (ug/L) * specific absorption (m2/mg)
+
+Unit conversion: m2/mg * ug/L = 1/m
+
+chla = sum of chl a AND pheophytin (Albert and Mobley 2003)
+
+specific absorption coefficients from Gege WASI program saved in `data/gege-wasi-spectra.csv`
+
+![](figs/astar-phyto-gege.png)
+
+## Chl a algorithms
+
+* From Appendix of Pahlevan et al 2020
+* 48 chl a algorithms assessed in Neil et al 2019 with 2,807 in situ spectra. Best performance by allowing model type and parameterisation to vary based on optical water types
+* categories: blue/green ratios used in open ocean waters (eg. 440/550 or 488/551), NIR/red (eg. 700/670) used in more turbid and eutrophic waters (chl a > 3 mg/m3), peak height relative to baseline, and neural networks (to estimate $a_{phy}$), semi-analytical (to estimate $a_{phy}$)
+* Chl a relationship to $a_{phy}(443)$ (Bricaud et al 1998, used in Neil et al 2019)
+* Menken et al 2006 found ratio of 700/670 best for chl a over wide variety of conditions
+
+> 1. **OC2** (MSI, multi-spectral, O'Reilly and Werdell 2019)
+
+* ocean chl a, based on blue-green ratio. expect non linear increase in green compared to blue with higher chl a absorption and scattering
+* empirically-derived, performed well in Neil et al. 2019 calibration study
+* for oligo and mesotrophic waters (< 10 mg/m3)
+* can confused turbid or CDOM rich waters with high chl a (higher reflectance in green and/or decrease in blue)
+
+sometimes $R_{rs}$ and sometimes $R_w$
+
+$$
+x = log_{10}\frac{R_{rs}(492)}{R_{rs}(560)}
+\\
+y = 0.2389 - 1.9369x + 1.7627x^2 - 3.0777x^3 - 0.1054x^4
+\\
+Chl_{OC2} = 10^y
+$$
+> 2. **OC3** (MSI, multi-spectral, O'Reilly and Werdell 2019)
+
+* empirically-derived, performed well in Neil et al. 2019 calibration study
+* for oligo and mesotrophic waters
+
+$$
+x = log_{10}\frac{max(R_{rs}(442), R_{rs}(492))}{R_{rs}(560)}
+\\
+y = 0.3308 - 2.6684x + 1.5990x^2 - 0.5525x^3 - 1.4876x^4
+\\
+Chl_{OC3} = 10^y
+$$
+
+> 3. **OC4** (OLCI, multi-spectral, O'Reilly and Werdell 2019)
+
+$$
+x = log_{10} [max(R_{rs}(442), R_{rs}(490), R_{rs}(510)) \times R_{rs}(560)]^{-1}
+\\
+y = 0.4254 - 3.2168x + 2.8691x^2 - 0.6263x^3 - 1.0933x^4
+\\
+Chl_{OC4} = 10^y
+$$
+> 4. **OCx** - MSI (O'Reilly and Werdell 2019)
+
+$$
+CI = R_{rs}(560) - (0.473 \times R_{rs}(442)) - (0.527 \times R_{rs}(665))
+\\
+Chl_{CI} = 10^{-0.4909 + 191.6590 \times CI}
+\\
+w = \frac{(Chl_{CI} - 0.15)}{(0.20 - 0.15)}
+$$
+* chl OCx depends on value of $Chl_{CI}$ (3 different ranges for below 0.15 mg/m3, above 0.20 mg/m3, in between)
+* only valid for CI less than -0.005 sr ?
+
+> 5. **OCx** - OCLI (Hu et al 2012, O'Reilly and Werdell 2019)
+
+* same as MSI but uses OC4 instead of OC3 for mid and high ranges of chl (above 0.15 mg/m3)
+
+> 6. **2-Band** (Moses et al 2012)
+
+$$
+Chl_{2band} = (35.75 \times \frac{R_{rs}(708)}{R_{rs}(665)} - 19.3)^{1.124}
+$$
+> 7. **3-Band** (Moses et al 2009b)
+
+$$
+Chl_{3band} = 232.329 \times (R_{rs}(665)^{-1} - R_{rs}(708)^{-1}) \times R_{rs}(753) + 23.17
+$$
+
+> 8. **Blend** (Smith et al 2018)
+
+* phi ($\phi$) is between 0.75 and 1.15 depending on value of r
+
+$$
+r = \frac{R_{rs}(708)}{R_{rs}(665)}
+\\
+w = \frac{(\phi - 0.75)}{(1.15 - 0.75)}
+\\
+Chl_{Blend} = w \times Chl_{2band} + abs(w -1) \times Chl_{OCx}
+$$
+
+> 9. **NDCI** (Mishra and Mishra 2012)
+
+$$
+Chl_{NDCI} = a + b \times \bigg( \frac{R_{rs}(708)-R_{rs}(665)}{R_{rs}(708)+R_{rs}(665)}\bigg) + c \times \bigg(\frac{R_{rs}(708)-R_{rs}(665)}{R_{rs}(708)+R_{rs}(665)}\bigg)^2
+\\
+a = 14.039 \\ b = 86.11 \\c = 194.325
+$$
+> 10. Gons (Gons et al. 2002, 2005)
+
+* semi-analytical 
+* ratio of NIR and red (eg. 708/665 nm) with additional coefficients for $a_w(665)$, $a_w(709)$, $a^*_{chl}(665)$, $b^p_b$
+* validated over waters with range of 3-185 mg/m3 chla 
+
+$$
+chla = \frac{\big(\frac{R_w708}{R_w665}\big)\times(a_w709+b_b)-a_w665-b^p_b}{a^*_{chl}(665)}
+\\b^b = \frac{0.6 \times a_w779 \times R_w779}{0.082 - 0.6 \times R_w779}
+$$
+
+> 11. Gilerson 2 band
+
+* generic empirical NIR-red ratio (Gilerson et al 2010)
+* performed well in Neil et al. 2019 calibration study
+* can be tuned over a large range of moderately turbid waters
+* ratio of NIR and red bands (eg. 708/665 nm), based on red absorption peak of chl a and NIR only water
+* better suited to waters with moderate to high chl a (2-200 mg/m3)
+* longer wavebands show less overlap in absorption between substances, so better where CDOM and particulates do not necessarily covary with chl a
+
+$$
+chla = (ax-b)^c
+\\ x = \frac{R_w(708)}{R_w(665)}
+$$
+* a, b, c are coefficients subjected to calibration
+
+## Particulate backscattering
+
+* water and particulates ($b_{bp}(\lambda)$
+* particulates sometimes partitioned into organic/inorganic or large/small sized, or phyto/non-algal
+* spectral shape described with power law:
+
+$$
+b^*_{bp}(\lambda) = \lambda^{-S_{bp}}
+$$
+* $S_{bp}$ varies between 0 and 3, presumably depending on particle size distribution
+* other approaches not assuming power law spectra in Werdell et al 2018 2.1.4.3
+
+## Turbidity algorithms
+
+1. Nechad (Nechad et al 2010, Dogliotti et al 2015)
+
+* widely validated, many adaptations
+* MSI bands 665, 708, 782, 865 nm for waters of increasing turbidity
+* A and C are waveband dependent lookup tables
+* can be linearly tuned with regression to reduce various biases (eg. as in Warren et al 2021)
+
+$$
+T = \frac{A \times R_w}{1-\frac{R_w}{C}}
+$$
+
+## Fluorescence
+
+* **Culver and Perry 1997** discuss calculations; chl a fluorescence can account for 10-40% upwelled irradiance at surface and 80% in subsurface
+* flourescence emission band for CHL around 681 nm (Gower et al 1999), 680-710
+* Fluorescence by dissolved organic matter influences the blue part of the spectrum, with a centre wavelength ∼ 430 nm, whereas phycoerythrin fluorescence is centred around 585nm, and chlorophyll-a fluorescence at about 685nm.
+* Vigneshwaran et al 2015 used hydrolight models. chl fluorescence is in red around 685-720 nm (with high productivity). Suggest that the magnitude and peak position of those wavelengths could indicate phytoplankton concentrations
+
+# Methods and approaches
+
+* Mixture Density Networks - a class of neural networks, Pahlevan et al 2020. Uses all available spectral bands to determine most suitable band combinations for various water types
+
+# Goodness of fit
+
+* Non-linear least squares minimization
+* Cauchy loss function to reduce effect of large outliers on convergence
+* Pahlevan et al 2021 RSE - median symmetric accuracy ($\epsilon$) and summetric signed percentage bias ($\beta$)
+
+$$
+\epsilon = 100 \times (10^Y-1)
+\\ Y = Median \big|log_{10}(\hat{q}/q)\big|
+\\
+\beta = 100 \times sign(Z)(10^{|Z|}-1)
+\\ Z = Median(log_{10}(\hat{q}/q))
+$$
+
+# Temporal overlaps
+
+* Pahlevan et al 2021 RSE use plus or minus 3 hours of HICO image acquisitions (105 chl a matchups)
+
+# Data sources
+
+* HICO - hyperspectral imager for coastal ocean, 358-719 nm (high uncertainty in UV < 400 nm) FWHM approx 5.7 nm, 100m spatial resolution
+* Envisat MERIS - Medium resolution imaging spectrometer (multi-spectral)
+* Hyperion
+* SeaWiFS bio-optical archive and storage system (SeaBASS)
+* MODIS
+* Sentinel 2 Multi-spectral imager (MSI)
+* Sentinel 3 Ocean and land colour instrument (OCLI), followup to MERIS
+* Copernicus Land Monitoring Service (CLMS) global lake water quality processing
+* Coastal Zone Color Scanner satellite (1978)
+* laboratory/reference spectra are compiled from JPL, JHU, and USGS. The ECOSTRESS spectral library is a compilation of over 3400 spectra of natural and man made materials. The ECOSTRESS spectral library (formerly ASTER spectral library) is at: https://speclib.jpl.nasa.gov/
+* https://ecosis.org/ Ecological Spectral Information System
+* 20m resolution AVIRIS (400-2500 nm, 224 bands) 
