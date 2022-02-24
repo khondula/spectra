@@ -1,0 +1,114 @@
+---
+title: "Reflectance Normalization"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(glue)
+library(tidyverse)
+library(readxl)
+library(lubridate)
+```
+
+# Background
+
+* Need to normalize measured (atmospherically corrected) reflectance spectra to 
+**normalized water-leaving reflectance** ($[R_w]_N$) based on zenith 
+illumination (angle between vertical and sun) and viewing geometry. 
+* Zenith angles are in the L3 reflectance metadata. 
+* `03-solar-zenith-angle.R` for extracting
+
+see USGS reference page [here](https://www.usgs.gov/land-resources/nli/landsat/solar-illumination-and-sensor-viewing-angle-coefficient-files)
+
+In hydrologic optics, models are sometimes defined based on zenith angle $theta$
+rather than scattering angle $\psi$, for the convenience of having $\theta$ 
+distinguish two hemispheres separated by the water surface. This makes parameters
+AOP (apparent) rather than IOP (inherent), without a correction for the angle 
+of incidence
+
+```{r}
+my_aq_site <- "BARC"
+my_aop_yr <- "2017"
+my_loc_type <- 'buoy.c0'
+```
+
+# Measured Reflectance Spectra
+
+> TODO: interpolate to the same wavelengths for all years? 
+
+```{r}
+spectra_dir <- "/Volumes/hondula/DATA/spectra_buff5m/"
+spectra_file <- fs::dir_ls(spectra_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
+
+spectra_df <- read_csv(spectra_file)
+my_spectra_pt <- spectra_df %>% filter(my_cellid)
+
+rrs <- spectra_df %>%
+  ggplot(aes(wavelength, reflectance)) +
+  geom_line(aes(group = cell)) +
+  geom_line(data = my_spectra_pt, col = "green", lwd = 1) +
+  theme_bw() +
+  coord_cartesian(ylim = c(0, 0.1)) +
+  theme(legend.position = "none")
+rrs + ggtitle(glue("Measured reflectance at {my_aq_site} {my_loc_type} {my_aop_yr}"))
+
+```
+
+```{r}
+my_wavelengths_rs <- my_spectra_pt$wavelength
+range(my_wavelengths_rs)
+```
+
+> TODO: Maybe This is wrong? these are the sensor not solar zenith angles
+
+Irradiance Reflectance just BELOW water surface:
+
+$R(0 -, \lambda) = C \frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}$
+
+Irradiance is diffuse and radiance is directional
+
+C is a function of solar altitude that is a linear function of $\mu_0$, the 
+cosine of the zenith angle of the refracted photons (Kirk 1984)
+
+$C(\mu_0) = -0.629\mu_0 + 0.975$
+
+As light passes through water-air interface, it undergoes refraction that increases
+its angle to the vertical. Surface factor of 0.544 (Austin 1980) relates 
+radiance just above the surface with radiance just below the surface. 
+
+**Diffuse component of remote sensing reflectance** just above the water surface:
+
+$r_D = 0.544(-0.629\mu_0 + 0.975) \frac{b_b(\lambda)}{a(\lambda) + b_b(\lambda)}$
+
+
+```{r}
+# zenith_dir <- "/Volumes/hondula/DATA/zenith-angles"
+# zenith_file <- fs::dir_ls(zenith_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
+# 
+# zenith_df <- read_csv(zenith_file)
+# my_zenith_pt <- zenith_df %>% filter(my_cellid)
+# my_zenith_pt$to_sensor_zenith_angle
+zenith_angle <- 32.01384 ## need to update these!!!
+mu0 <- cos(zenith_angle)
+mu0
+C_mu0 = -0.629 * mu0 + 0.975
+surface_factor = 0.544
+```
+
+Calculate normalized water leaving reflectance from surface factor and $cos(\mu_0)$
+
+$R_{rs}$ 
+
+$[R_w]_N = R_{rs}$
+
+```{r}
+# rD = 0.544 * C_mu0 * (backs_water/ (abs_total + backs_water)
+```
+

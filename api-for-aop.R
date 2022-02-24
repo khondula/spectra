@@ -26,7 +26,7 @@ get_flightline_ids('OSBS', 'BARC_AOSpts')
 get_flightline_ids('TOOL', 'TOOK_AOSpts')
 get_flightline_ids('UNDE', 'CRAM_AOSpts')
 get_flightline_ids('WOOD', 'PRPO_AOSpts')
-get_flightline_ids('WOOD', 'PRLA_AOSpts')
+get_flightline_ids('WOOD', 'PRLA_AOSpts', keep_kmls = TRUE)
 
 fs::dir_ls('results/l1-flightlines') %>%
   purrr::map_df(~read_csv(.x)) %>% write_csv('results/l1-flightlines.csv')

@@ -9,7 +9,7 @@ spectra_dir <- "data/spectra_buff5m"
 spectra_file <- fs::dir_ls(spectra_dir, regexp = glue("{my_aq_site}_{my_aop_yr}"))
 spectra_df <- read_csv(spectra_file)
 my_spectra_pt <- spectra_df %>% filter(my_cellid) %>% 
-  filter(wavelength < 800, wavelength > 400)
+  filter(wavelength < 700, wavelength > 400)
 # probably need to chop off < 400 nm? 
 my_spectra_pt
 my_spectra_pt$reflectance %>% plot()
@@ -40,7 +40,7 @@ beta <- c(abs440_cdom[i],
           bbp_gamma[i],
           runif(1, 0, 1)) # random error
 # Forward Spectral models
-y = my_spectra_pt$reflectance
+y = my_spectra_pt$reflectance/pi
 plot(y)
 spectra_error_model <- function(beta, y){
   ## CDOM Absorption
@@ -67,7 +67,7 @@ spectra_error_model <- function(beta, y){
   # my_gamma = 1.6 
   Rrs_model_spectra <- (0.52 * rrs_model_spectra)/(1-1.6*rrs_model_spectra) + beta[11]
   sum(((y - Rrs_model_spectra)^2)/length(my_wls))
-  
+  # max(abs(y - Rrs_model_spectra))
   # return(Rrs_model_spectra)
 }
 
@@ -118,6 +118,10 @@ data.frame(wl = my_wls,
            rrs_meas = y,
            rrs_model = spectra_params_model(beta_init)) %>%
   ggplot(aes(x = wl, y = rrs_model)) +
+  geom_vline(aes(xintercept = c(442)), col = 'green', lwd = 2) +
+  geom_vline(aes(xintercept = c(665)), col = 'green', lwd = 2) +
+  geom_vline(aes(xintercept = c(625)), col = 'darkgreen', lwd = 2, alpha = 0.5) +
+  geom_line(aes(y = rrs_meas), col = 'blue') +
   geom_point(aes(y = rrs_meas), col = 'blue') +
   geom_point() +
   ylim(0, NA) +
@@ -147,26 +151,23 @@ my_optim <- optimx(
   beta_init, # initial guess! for betas
   spectra_error_model, # what function to optimize
   y = y, # arguments to your function
-  control = list(maxit = 1000,
+  # lower = c(0, 0, 100, 0, 0, 100, 0, 0, 100, 0, 0),
+  # lower = c(),
+  control = list(maxit = 10000,
                  all.methods = TRUE))  
 
 my_optim %>% arrange(convcode)
-# beta_init <- c(abs440_cdom[i],
-#           slope_cdom[i],
-#           ref_cdom[i],
-#           abs440_nap[i],
-#           slope_nap[i],
-#           ref_napA[i],
-#           chl_ugL[i],
-#           backs440_parts[i],
-#           ref_napBb[i],
-#           bbp_gamma[i],
-#           runif(1, 0, 1))
-beta_optim <- my_optim[1,1:11] %>% unlist()
+
+beta_optim <- my_optim["BFGS",1:11] %>% unlist()
+beta_optim <- my_optim["L-BFGS-B",1:11] %>% unlist()
+beta_optim <- my_optim["Nelder-Mead",1:11] %>% unlist()
+
 data.frame(wl = my_wls, 
            rrs_meas = y,
            rrs_model = spectra_params_model(beta_optim)) %>%
   ggplot(aes(x = wl, y = rrs_model)) +
+  geom_line(col = 'black') +
+  geom_line(aes(y = rrs_meas), col = 'blue') +
   geom_point(aes(y = rrs_meas), col = 'blue') +
   geom_point() +
   ylim(0, NA) +

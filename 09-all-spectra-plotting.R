@@ -1,5 +1,6 @@
 library(tidyverse)
 library(glue)
+library(vroom)
 
 # copy over meta and spectra from Volumes to results for reading in
 cell_info_df <- fs::dir_ls('/Volumes/hondula/DATA/L1-reflectance/meta') %>% 
@@ -25,24 +26,59 @@ cell_info_df <- read_csv('results/l1-info.csv')
 
 mysite <- 'TOMB'
 
+lake_river_sites <- c('BARC', 'SUGG', 'CRAM', 'LIRO', 'PRPO', 'PRLA', 'TOOK', 'FLNT', 'BLWA', 'TOMB')
+mysite <- lake_river_sites[1]
 spectra_files <- fs::dir_ls('results/L1-reflectance2/spectra')
-mysite_spectra_files <- grep(mysite, spectra_files, value = TRUE)
+mysite_spectra_files_list <- purrr::map(lake_river_sites, ~grep(.x, spectra_files, value = TRUE))
 
+read_site_spectra <- function(spectra_files){
+  df <- spectra_files %>% 
+    purrr::map(~read_tsv(.x)) %>%
+    purrr::map(~tidyr::pivot_longer(.x, cols = -c(wl, band), names_to = 'loctype')) %>%
+    bind_rows(.id = 'filename') %>%
+    mutate(filename = tools::file_path_sans_ext(basename(filename))) %>%
+    mutate(flightline = str_sub(filename, 24, 38)) %>%
+    dplyr::filter(value != -9999) %>%
+    dplyr::filter(!loctype %in% c('buoy.c1', 'buoy.c2', 'inlet', 'outlet', 'reach')) %>%
+    mutate(aop_yr = str_sub(flightline, 1, 4)) %>%
+    mutate(siteid = str_sub(filename, 1, 4))
+  return(df)
+}
 
+spectra_df <- mysite_spectra_files_list %>%
+  purrr::map(~read_site_spectra(.x)) %>%
+  bind_rows()
 
-mysite_spectra <- mysite_spectra_files %>% 
-  purrr::map(~read_tsv(.x)) %>%
-  # purrr::map(~dplyr::select(.x, -band)) %>%
-  purrr::map(~tidyr::pivot_longer(.x, cols = -c(wl, band), names_to = 'loctype')) %>%
-  bind_rows(.id = 'filename') %>%
-  mutate(filename = tools::file_path_sans_ext(basename(filename))) %>%
-  mutate(flightline = str_sub(filename, 24, 38)) %>%
-  dplyr::filter(value != -9999) %>%
-  # left_join(barc_meta) %>%
-  dplyr::filter(!loctype %in% c('buoy.c1', 'buoy.c2'))
+# mysite_spectra <- mysite_spectra_files %>% 
+#   purrr::map(~read_tsv(.x)) %>%
+#   # purrr::map(~dplyr::select(.x, -band)) %>%
+#   purrr::map(~tidyr::pivot_longer(.x, cols = -c(wl, band), names_to = 'loctype')) %>%
+#   bind_rows(.id = 'filename') %>%
+#   mutate(filename = tools::file_path_sans_ext(basename(filename))) %>%
+#   mutate(flightline = str_sub(filename, 24, 38)) %>%
+#   dplyr::filter(value != -9999) %>%
+#   # left_join(barc_meta) %>%
+#   dplyr::filter(!loctype %in% c('buoy.c1', 'buoy.c2', 'inlet', 'outlet')) %>%
+#   mutate(aop_yr = str_sub(flightline, 1, 4)) %>%
+#   mutate(siteid = str_sub(filename, 1, 4))
   
+spectra_df %>%
+  # filter(siteid != 'PRLA') %>%
+  mutate(siteid = forcats::fct_relevel(siteid, 'TOMB', 'FLNT', 'BLWA', 
+                                       'BARC', 'SUGG', 'TOOK', 'PRPO', 'PRLA')) %>%
+  ggplot(aes(x = wl, y = value/10000, group = flightline)) +
+  geom_line(aes(col = aop_yr), lwd = 0.5) +
+  # xlim(c(NA, 900)) +
+  coord_cartesian(ylim = c(0, 0.1), xlim = c(400, 800)) +
+  facet_wrap(vars(siteid), ncol = 3) +
+  theme_bw() +
+  ylab('Reflectance (%)') +
+  xlab('wavelength (nm)') +
+  ggtitle('L1 reflectance from Lake and River buoy locations')
+
+ggsave('l1-refl-lake-river.png', width = 8, height = 6)
+
 mysite_spectra %>% 
-  mutate(aop_yr = str_sub(flightline, 1, 4)) %>%
   ggplot(aes(x = wl, y = value/10000)) +
   geom_rect(aes(xmin = 1260, xmax = 1560, ymin = -Inf, ymax = Inf), fill = 'gray') +
   geom_rect(aes(xmin = 1760, xmax = 1960, ymin = -Inf, ymax = Inf), fill = 'gray') +
@@ -52,8 +88,8 @@ mysite_spectra %>%
   xlim(c(NA, 900)) +
   coord_cartesian(ylim = c(0, 0.1)) +
   theme_bw() +
-  facet_grid(vars(aop_yr), vars(loctype)) +
-  # facet_wrap(vars(loctype)) +
+  # facet_grid(vars(aop_yr), vars(loctype)) +
+  # facet_wrap(vars(aop_yr)) +
   # theme(legend.position = 'bottom') +
   ggtitle(glue('L1 Reflectance at {mysite} AOS pts'))
 

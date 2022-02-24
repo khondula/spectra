@@ -7,6 +7,7 @@ editor_options:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
 ```
 
 # Aquatic Remote Sensing
@@ -14,6 +15,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Reflectance terminology
 
 ### Definitions and theory
+
+Videos: https://www.ioccg.org/training/lectures.html
+
+> Read about normalized reflectances [here]( https://www.oceanopticsbook.info/view/atmospheric-correction/normalized-reflectances)
 
 * [Overview from ocean optics book](https://www.oceanopticsbook.info/view/inherent-and-apparent-optical-properties/reflectances) of $R_{rs}$ vs. $R$ - better AOP because it is less sensitive to sky conditions while remaining very sensitive to different IOPs
 * **Remote sensing reflectance** $R_{rs}(\lambda)$ ($sr^-1$) is ratio of water leaving *radiance* to total downwelling irradiance
@@ -34,6 +39,8 @@ $$\rho = \frac{\pi L}{cos\theta_0 (E_d)}
 \\R_{rs} = \frac{L_w}{E_d} \times f_{bdrf}(\lambda)
 \\R_{rs} = \rho \times \frac{\cos\theta_s}{\pi}$$
 
+* Balasubramanian et al 2020 RSE use $R_{rs} = \rho_w/\pi$
+
 $\pi$ is the light distribution factor ($Q = \frac{E_u}{L_u}$ [$sr^{-1}$]), assuming an *isotropic light field*, where light is reflected evenly in all directions.
 
 ![](figs/isotropy.jpeg)
@@ -41,10 +48,27 @@ $\pi$ is the light distribution factor ($Q = \frac{E_u}{L_u}$ [$sr^{-1}$]), assu
 
 ### Surface to Subsurface Reflectance 
 
-Airborne measurements are surface reflectance ($R_{rs}$ or $R_{rs}(0+)$), affected by refraction and such at the surface of the water. There's the widely used Gordon et al 1988 model to convert surface to subsurface reflectance ($r_{rs}$ or $R_{rs}(0-)$) - more directly related to IOPS - as well as several alternatives (see appendix A in Werdell et al. 2018). 
+Airborne measurements are surface reflectance ($R_{rs}$ or $R_{rs}(0+)$), affected by refraction and such at the surface of the water. There's the widely used Gordon et al 1988 model (standard NASA approach) to convert surface to subsurface reflectance ($r_{rs}$ or $R_{rs}(0-)$) - more directly related to IOPS - as well as several alternatives (see appendix A in Werdell et al. 2018). (The two following equations are the same just different notation for surface/subsurface)
 
 
-$$r_{rs} = \frac{R_{rs}(\lambda)}{0.52 + 1.7\ R_{rs}(\lambda)}$$
+$$R_{rs}(0-) = \frac{R_{rs}(0+)}{0.52 + 1.7\ R_{rs}(0+)}
+\\r_{rs} = \frac{R_{rs}(\lambda)}{0.52 + 1.7\ R_{rs}(\lambda)}$$
+
+In most cases (reflectance below 0.3 $sr^{-1}$), subsurface remote sensing reflectance is modeled to be a small percentage higher than surface remote sensing reflectance. So what is observed at the water surface is slightly less reflectance than right below water surface.  (could potentially   test this with comparison of PAR above and below)
+
+```{r, echo = FALSE}
+xx <- seq(0.01, 0.5, by = 0.001)
+yy = xx/(0.52 + 1.7*xx)
+
+data.frame(xx, yy) %>%
+  ggplot(aes(x = xx, y = yy)) +
+  geom_line(col = 'blue') +
+  geom_abline(slope = 1, intercept = 0, lty = 2) +
+  theme_bw() +
+  xlab('Surface R_rs') + ylab('Subsurface r_rs')
+```
+
+
 ### Subsurface Reflectance as a function of IOPs
 
 **Gordon et al 1975, 1998** model for remote sensing reflectance just below the water surface based on Monte Carlo simulations. See Lee et al 2002 for some discussion of g1 and g2. 
@@ -55,6 +79,10 @@ $$r_{rs}(\lambda) = \frac{L_u(0^-,\lambda)}{E_d(0^-,\lambda)} = g_1\bigg(\frac{b
 * G1 = 0.0949, G2 = 0.0794, or Lee et al. coefficients
 * G coefficients represent illumination, geometry, and sea surface properties
 
+### Normalized reflectance
+
+* making the spectra all 0-1
+* median centering and interquartile scaling used in Balasubramian et al 2020
 
 ## Atmospheric correction and Glint
 
@@ -65,6 +93,7 @@ $L_u = L_w + L_r$
 * In general, methods for high resolution images make no assumptions about the angle of the water surface and instead use image-based information with the assumption of no NIR water leaving radiance
 * $R^{surf}_{rs}(\lambda)$ is reflections at the water surface (glint)
 * POLYMER (Steinmetz et al 2011) shown to work well with MSI, OLCI in optically complex waters 
+* ACOLITE (v20190326.0) commonly used in highly turbid waters
 * NEON uses ATCOR, which is proprietary but relies a lot on the value of the aerosol optical thickness which is based on observations over "dark dense vegetation".
 * Pahlevan et al 2021 review atmospheric correction for Landsat and Sentinel, comparing to validation data sets. Median errors are 20-30% for the best performing processors, which propagates to 25-75% uncertainty in derived chl a and TSS products.
 * Learn more about FLAASH [here](https://www.l3harrisgeospatial.com/docs/flaash.html)
@@ -98,7 +127,20 @@ also with standard deviations
 ## CDOM absorption
 
 * operationally defined based on 0.2 um pore size of filters
-* modeled with a fixed shape (exponential)
+* absorption decreases in a near-expondential manner from UV to far visible wavelengths declining to near zero between 650 and 700 nm
+* modeled with a fixed shape (exponential). 
+* Shape associated superposition of chromophores or charge transfer process
+* absorption losses in different regions of UV have been linked to different processes. UVC (100-280 nm), UVB (280-315), UVA (315-400)
+* **photobleaching** is the loss of absorption, directly linked to exposure to natural sunlight
+* natural log absorbance ($m^{-1}$) = $2.303  \times \frac{A}{L(m)}$ for A log10
+* To covert a base 10 logarithm to a natural logarithm, multiply by loge10 (=2.303).
+* below 500 nm, photodegradation increases spectral slope and above 510 nm, photodegraded CDOM decreases spectral slope (Loiselle et al 2009)
+* optimal wavelength interval is 20 nm, report center wavelength eg. $S_{250}$ for 240-259 nm
+* E2:E3 is the ratio of absorption at 250 and 365 and is associated with relative size of DOM molecules (Helms et al 2008)
+* E4:E6 is ratio of absorption at 465 and 665 and is associated with CDOM aromaticity, molecular size, atom ratios, etc. and a general tracer of humification
+* SUVA 254 (UV absorption at 254 normalized to DOC content) correlates with DOM aromaticity (Weishaar et al 2003)
+
+
 
 $$
 a^*_{dg}(\lambda) = exp(-S_{dg}\lambda)
@@ -108,6 +150,7 @@ $$
 $$
 S_{dg} = 0.015 + \frac{0.002}{0.6 + r_{rs}(443)/r_{rs}(55x)}
 $$
+
 * $S_{cdom}$ range 0.01-0.03 and $S_{nap}$ range 0.005-0.015
 * getting cdom spectral slope from satellite data could provide indicator of source, molecular size, aromatic content, and extent of photochemical vs microbial degradation of organic matter
 * NAP spectral slope can inform proportion of mineral and organic matter (Babin et al 2003)
@@ -132,7 +175,24 @@ $$Y = a_{CDOM}(\lambda_{0})[m^{-1}]$$
 
 ## CDOM algorithms
 
+* Zhu et al 2014 RSE assessment of CDOM algorithms in freshwater
+* Zhang et al 2015 for spectral slope (different intercept for different optical water types):
+
+$$
+Y_{cdm} = 0.015 + \bigg(\frac{0.002}{0.6 + r_rs(443)/r_{rs}(560)}\bigg)
+\\Y_{cdm} = 0.019 + \bigg(\frac{0.002}{0.6 + r_rs(443)/r_{rs}(560)}\bigg)
+$$
+
+
 * ratio of 670/571 nm to estimate humic color (used in Menken et al 2006)
+
+* Particulate organic carbon algorithm for [ocean color](https://oceancolor.gsfc.nasa.gov/atbd/poc/) is power law applied to blue (443) /green (between 547-565) band ratio 
+
+$$
+poc = a \times \bigg(\frac{R_{rs}443}{R_{rs}555}\bigg)^b
+\\a = 203.2
+\\b = -1.034
+$$
 
 ## Phytoplankton absorption background
 
@@ -211,6 +271,8 @@ $$
 
 > 3. **OC4** (OLCI, multi-spectral, O'Reilly and Werdell 2019)
 
+adapted for 443/490/510 and 555 as descrbied in Moore et al 2014 section 2.2 (same form different coefficients)
+
 $$
 x = log_{10} [max(R_{rs}(442), R_{rs}(490), R_{rs}(510)) \times R_{rs}(560)]^{-1}
 \\
@@ -259,12 +321,14 @@ $$
 
 > 9. **NDCI** (Mishra and Mishra 2012)
 
+* uses spectral band difference at 709 nm and 685 nm but normalies by the sum of the two relfectances to reduce differences in solar and atmospheric variability
+
 $$
 Chl_{NDCI} = a + b \times \bigg( \frac{R_{rs}(708)-R_{rs}(665)}{R_{rs}(708)+R_{rs}(665)}\bigg) + c \times \bigg(\frac{R_{rs}(708)-R_{rs}(665)}{R_{rs}(708)+R_{rs}(665)}\bigg)^2
 \\
 a = 14.039 \\ b = 86.11 \\c = 194.325
 $$
-> 10. Gons (Gons et al. 2002, 2005)
+> 10. Gons (Gons et al. 2002, 2005, 2008)
 
 * semi-analytical 
 * ratio of NIR and red (eg. 708/665 nm) with additional coefficients for $a_w(665)$, $a_w(709)$, $a^*_{chl}(665)$, $b^p_b$
@@ -290,21 +354,72 @@ chla = (ax-b)^c
 $$
 * a, b, c are coefficients subjected to calibration
 
+> 12. Maximum Chlorophyll Index (MCI) or Fluorescent Line height (FLH)
+
+* Both take the same form - height or depth of spectral peak or trough over/under baseline from two surrounding bands (see Kravitz et al 2020). $\lambda_2$ is the peak/trough and 1 and 3 are neighboring reflectances. FLH peaks at 681 nm (OLCI) and 709 (MCI)
+* MPH finds highest peak in red/NIR (Matthews et al. 2012, Matthews and Odermatt 2015), flags each pixel as dominated by cyanobacteria or algae and calculates chl a from empircal relationship
+
+$$
+chla \propto R(\lambda_2) - R(\lambda_1) + \bigg(R(\lambda_1) - R(\lambda_3)\frac{\lambda_2-\lambda_1}{\lambda_3-\lambda_1}\bigg)
+$$
+
 ## Particulate backscattering
 
-* water and particulates ($b_{bp}(\lambda)$
+* water and particulates ($b_{bp}(\lambda)$)
 * particulates sometimes partitioned into organic/inorganic or large/small sized, or phyto/non-algal
 * spectral shape described with power law:
 
 $$
 b^*_{bp}(\lambda) = \lambda^{-S_{bp}}
 $$
+
 * $S_{bp}$ varies between 0 and 3, presumably depending on particle size distribution
 * other approaches not assuming power law spectra in Werdell et al 2018 2.1.4.3
 
-## Turbidity algorithms
+$$ 
+Y_{bbp} = 2\times\bigg(1-1.2\exp\Big(-0.9\frac{r_{rs}(443)}{r_{rs}(560)}\Big)\bigg)
+$$
+
+> good references
+
+* Balasubramanian et al 2020 RSE
+
+## Turbidity or TSS algorithms
+
+* site-specific studies often utilize a single red band for TSS retrievals, which can provide reasonably accurate estimates within limited TSS ranges, either linear regression or higher order polynomials. 
+* Performance of single red-band algorithms degrades in areas with extreme sediment loads because of a saturation effect. Then bands longer than 700 nm are used such as 865, 1020, or 1071 (but they don't work as well at low to moderate TSS eg. below 50 g/m3 because water absorption signal is stronger than particulate backscattering. 
+* TSS categories in Balasubramian et al 2020: type 1 Rrs560 < Rrs492, type 2 is 665 < 560 and 665 > 492 and 560 > 492, type 3 665 > 560 and 740 > 0.01/sr (check for green water, then brown water, then blue-green water which is optically mixed with no dominant constituent)
+
+* table A2 of Balasubramian et al 2020 RSE lists 5 algorithms
+
+1. Miller and McKee 2004
+
+$$(1140.25 \times R_{rs}668) -1.91$$
 
 1. Nechad (Nechad et al 2010, Dogliotti et al 2015)
+
+$$
+1.74 + (355.85\rho_w(665))/(1-(\rho_w665/1728))
+$$
+
+1. Petus et al 2010
+
+$$
+12450 (R_{rs}668)^2 + 666.1 (R_{rs}668) + 0.4
+$$
+
+1. Ondrusek et al 2012
+
+$$
+3.8813 (nL_w665)^3 - 13.822 (nL_w665)^2 + 19.61 (nL_w665)
+$$
+
+1. Novoa et al. 2017 - separate for type 1 and 2 vs type 3
+
+$$
+531.5 \times \rho_w665
+\\37150 \times (\rho_w865)^2 + 1751 \times (\rho_w865)
+$$
 
 * widely validated, many adaptations
 * MSI bands 665, 708, 782, 865 nm for waters of increasing turbidity
@@ -315,12 +430,15 @@ $$
 T = \frac{A \times R_w}{1-\frac{R_w}{C}}
 $$
 
-## Fluorescence
+## Fluorescence background
 
 * **Culver and Perry 1997** discuss calculations; chl a fluorescence can account for 10-40% upwelled irradiance at surface and 80% in subsurface
-* flourescence emission band for CHL around 681 nm (Gower et al 1999), 680-710
+* solar-induced chla flourescence peak emission band for CHL around 681 nm (Gower et al 1999), 680-710
 * Fluorescence by dissolved organic matter influences the blue part of the spectrum, with a centre wavelength ∼ 430 nm, whereas phycoerythrin fluorescence is centred around 585nm, and chlorophyll-a fluorescence at about 685nm.
 * Vigneshwaran et al 2015 used hydrolight models. chl fluorescence is in red around 685-720 nm (with high productivity). Suggest that the magnitude and peak position of those wavelengths could indicate phytoplankton concentrations
+
+
+
 
 # Methods and approaches
 
@@ -328,6 +446,9 @@ $$
 
 # Goodness of fit
 
+* RMSE - more comprehensive than bias or MARE because it combines the mean and variance of the error distribution into a single term
+* bias (average difference) - speaks to systematic offsets
+* median absolute relative error (MARE)
 * Non-linear least squares minimization
 * Cauchy loss function to reduce effect of large outliers on convergence
 * Pahlevan et al 2021 RSE - median symmetric accuracy ($\epsilon$) and summetric signed percentage bias ($\beta$)
@@ -343,6 +464,7 @@ $$
 # Temporal overlaps
 
 * Pahlevan et al 2021 RSE use plus or minus 3 hours of HICO image acquisitions (105 chl a matchups)
+* merged satellite products for ocean color - Maritorena et al 2010 RSE
 
 # Data sources
 
@@ -350,11 +472,18 @@ $$
 * Envisat MERIS - Medium resolution imaging spectrometer (multi-spectral)
 * Hyperion
 * SeaWiFS bio-optical archive and storage system (SeaBASS)
-* MODIS
-* Sentinel 2 Multi-spectral imager (MSI)
+* MODIS - Moderate resolution imaging spectroradiometer
+* VIIRS - Visible infrared imaging radiometer suite
+* OLI - Operational land imager
+* Sentinel 2-A/B Multi-spectral imager (MSI)
 * Sentinel 3 Ocean and land colour instrument (OCLI), followup to MERIS
 * Copernicus Land Monitoring Service (CLMS) global lake water quality processing
 * Coastal Zone Color Scanner satellite (1978)
 * laboratory/reference spectra are compiled from JPL, JHU, and USGS. The ECOSTRESS spectral library is a compilation of over 3400 spectra of natural and man made materials. The ECOSTRESS spectral library (formerly ASTER spectral library) is at: https://speclib.jpl.nasa.gov/
 * https://ecosis.org/ Ecological Spectral Information System
 * 20m resolution AVIRIS (400-2500 nm, 224 bands) 
+* MERMAID (protocols: http://mermaid.acri.fr/dataproto/dataproto.php
+* LIMNADES
+* NOMAD - Nasa bio-optical marine algorithm dataset
+* DESIS - german hyperspectral instrument on ISS, getting high repeat over many sites, all data freely available
+* CHIME - esa imaging spectroscopy mission, 27 sites getting high frequency sampling for preparatory activity
